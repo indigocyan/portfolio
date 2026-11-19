@@ -651,3 +651,7 @@ body.lite .sub-white::after, body.lite .strip::after, body.lite .sub-detail::aft
 body.lite .mi-white::after, body.lite .tagbox::after, body.lite .gl-row::after, body.lite .tm::after, body.lite .logo-bar::after { display: none; }
 body.lite .surge-body { background: linear-gradient(180deg, #4a72ff 0%, #1d43e2 18%, #1230c4 55%, #0b2196 100%); }
 body.lite .marq { animation-duration: 14s; }
+
+/* PRESS ANY KEY: a blue copy of the outline, masked to the moon's disc, keeps it readable over the bright moon */
+.press-blue { position: absolute; left: 0; pointer-events: none; -webkit-text-stroke: 3px #1636d6; text-shadow: none; }
+body.st-press .press-blue { animation: pressPulse 2.2s ease-in-out infinite; }

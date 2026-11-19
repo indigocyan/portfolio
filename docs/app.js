@@ -217,7 +217,7 @@ function setLite(on, remember) {
   let saved = null;
   try { saved = localStorage.getItem(LITE_KEY); } catch {}
   setLite(saved === null ? autoLite() : saved === '1', false);
-  $('#lite-toggle').addEventListener('click', () => { setLite(!body.classList.contains('lite'), true); toast(body.classList.contains('lite') ? 'Lite mode on: fewer effects' : 'Lite mode off: full effects'); });
+  $('#lite-toggle').addEventListener('click', () => { setLite(!body.classList.contains('lite'), true); if (state === 'press') setTimeout(updatePressMask, 30); toast(body.classList.contains('lite') ? 'Lite mode on: fewer effects' : 'Lite mode off: full effects'); });
 })();
 
 async function goHome() {
@@ -307,11 +307,36 @@ function selectHome(i, quiet) {
 }
 
 // first screen of a visit: "press any key" over the night window
+// The moon sits where the night shader draws it (same constants as scene.js), or where the CSS moon is
+// in Lite mode / without WebGL. The blue outline copy is shown only inside that disc.
+function moonDisc() {
+  const gl = !body.classList.contains('lite') && $('.night').classList.contains('gl-on');
+  if (!gl) { const m = $('.moon').getBoundingClientRect(); return { x: m.left + m.width / 2, y: m.top + m.height / 2, r: m.width / 2 }; }
+  const W = innerWidth, H = innerHeight, portrait = W < H;
+  const mc = portrait ? [-.05, .2] : [-.2, .19], R = portrait ? .2 : .25;
+  return { x: W / 2 + mc[0] * H, y: H / 2 - mc[1] * H, r: R * H };
+}
+function updatePressMask() {
+  const big = $('#press-big'), blue = $('#press-blue');
+  if (!big.childNodes.length) return;
+  blue.replaceChildren(...[...big.childNodes].map((n) => n.cloneNode(true)));
+  blue.style.top = big.offsetTop + 'px';
+  const m = moonDisc(), b = blue.getBoundingClientRect();
+  const r = m.r * 1.03;   // include the bright rim of the glow
+  const mask = `radial-gradient(circle at ${(m.x - b.left).toFixed(1)}px ${(m.y - b.top).toFixed(1)}px, #000 ${r.toFixed(1)}px, transparent ${(r + 6).toFixed(1)}px)`;
+  blue.style.webkitMaskImage = blue.style.maskImage = mask;
+}
+addEventListener('resize', () => { if (state === 'press') updatePressMask(); });
+
 function showPress() {
   const touch = matchMedia('(hover: none)').matches;
   $('#press-small').textContent = data.profile?.name ? `${data.profile.name} · Portfolio` : 'Portfolio';
   $('#press-big').replaceChildren(...(touch ? ['TAP', 'TO', 'START'] : ['PRESS', 'ANY', 'KEY']).flatMap((w, i) => i ? [h('br'), w] : [w]));
   setState('press');
+  // re-measure once the scene (and fonts) have settled: the shader starts lazily
+  requestAnimationFrame(updatePressMask);
+  setTimeout(updatePressMask, 400);
+  setTimeout(updatePressMask, 1200);
 }
 async function leavePress() {
   if (state !== 'press' || busy) return;
