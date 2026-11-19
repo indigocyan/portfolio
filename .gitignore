@@ -1,0 +1,7 @@
+# Never publish the admin key — it is what makes this PC the only editor.
+.admin_key
+docs/profile.json.tmp
+.claude/
+node_modules/
+# Your LinkedIn photo stays on this PC (dropped from the site for now)
+assets/

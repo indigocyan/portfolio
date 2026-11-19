@@ -1,0 +1,9 @@
+{
+  "name": "p3r-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Persona-style portfolio. Public read-only, editable only from this PC.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

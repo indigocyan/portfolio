@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nipun Murlidharan</title>
+  <meta name="description" content="Portfolio of Nipun Murlidharan">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..900;1,62..125,300..900&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="st-intro">
+
+  <div class="bg" aria-hidden="true">
+    <canvas id="sea-gl"></canvas>
+    <div class="water w1"></div>
+    <div class="water w2"></div>
+    <div class="rays"></div>
+    <div class="fx" id="fx"></div>
+  </div>
+
+  <div class="strip" aria-hidden="true"><div class="strip-text" id="strip-text"></div></div>
+  <button class="tagbox" id="tagbox" type="button" aria-label="Back to home"><b id="tag-name"></b><small id="tag-sub"></small><span class="tag-home">◀ HOME</span></button>
+
+  <!-- HOME: title-screen style (night window, name logo, title menu) -->
+  <section class="home" id="home" aria-label="Home">
+    <div class="night" aria-hidden="true">
+      <canvas id="night-gl"></canvas>
+      <div class="moon"></div>
+      <div class="clouds"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="window"><i class="v1"></i><i class="v2"></i><i class="v3"></i><i class="h1"></i></div>
+      <div class="night-shade"></div>
+    </div>
+    <div class="press" id="press">
+      <div class="press-small" id="press-small"></div>
+      <div class="press-big" id="press-big"></div>
+    </div>
+    <div class="logo" id="logo" aria-hidden="true">
+      <div class="logo-top" id="logo-top"></div>
+      <div class="logo-bar"><span id="logo-bot"></span></div>
+      <div class="logo-sub" id="logo-sub"></div>
+    </div>
+    <div class="glance" id="glance"><div class="glance-list" id="glance-list"></div></div>
+    <nav class="title-menu" id="title-menu" aria-label="Title menu"></nav>
+  </section>
+
+  <nav class="menu" aria-label="Sections"><div class="menu-rot" id="menu"></div></nav>
+
+  <div class="guide" id="guide" aria-live="polite"><span class="guide-text" id="guide-text"></span><span class="guide-label">Guide</span></div>
+
+  <section class="sub" id="sub" aria-hidden="true">
+    <div class="sub-dark"></div>
+    <div class="sub-white"></div>
+    <div class="sub-title" id="sub-title"></div>
+    <button class="sub-back" id="sub-back" type="button">BACK</button>
+    <div class="sub-head" id="sub-head"></div>
+    <div class="sub-list" id="sub-list" role="listbox" tabindex="-1"></div>
+    <div class="sub-detail" id="sub-detail"><span class="sub-detail-tag">Details</span><div id="sub-detail-text"></div></div>
+  </section>
+
+  <div class="splash" id="splash" aria-hidden="true"></div>
+
+  <div class="owner" id="owner" hidden>
+    <span class="owner-tag">OWNER</span>
+    <button class="obtn" id="edit-toggle" type="button">EDIT</button>
+    <button class="obtn" id="import-btn" type="button" title="Import a LinkedIn data export (.zip or .csv) or a JSON backup">IMPORT</button>
+    <input type="file" id="import-file" accept=".zip,.csv,.json,application/zip,text/csv,application/json" multiple hidden>
+    <button class="obtn hot" id="save-btn" type="button" hidden>SAVE</button>
+    <button class="obtn hot" id="publish" type="button">PUBLISH</button>
+  </div>
+  <button class="lite-toggle" id="lite-toggle" type="button" aria-pressed="false" title="Fewer effects for slower devices">LITE MODE <b>OFF</b></button>
+  <div class="toast" id="toast" role="status"></div>
+  <datalist id="platforms"><option>LinkedIn</option><option>GitHub</option><option>Instagram</option><option>X</option><option>YouTube</option><option>Behance</option><option>Dribbble</option><option>Medium</option><option>LeetCode</option><option>Discord</option><option>Website</option></datalist>
+
+  <script src="scene.js"></script>
+  <script src="importer.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

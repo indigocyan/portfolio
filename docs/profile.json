@@ -1,0 +1,43 @@
+{
+  "profile": {
+    "name": "Nipun Murlidharan",
+    "headline": "LOBA || IIT Tirupati",
+    "location": "Trivandrum, Kerala, India",
+    "pronouns": "He/Him",
+    "about": ""
+  },
+  "skills": [],
+  "experience": [],
+  "education": [
+    {
+      "school": "Indian Institute of Technology Tirupati",
+      "degree": "Bachelor of Technology",
+      "field": "Electrical, Electronics and Communications Engineering",
+      "start": "",
+      "end": "",
+      "description": ""
+    },
+    {
+      "school": "Loyola School Thiruvananthapuram",
+      "degree": "",
+      "field": "",
+      "start": "",
+      "end": "",
+      "description": ""
+    }
+  ],
+  "projects": [],
+  "certifications": [],
+  "contact": {
+    "email": "nipun.murlidharan@gmail.com",
+    "phone": ""
+  },
+  "socials": [
+    {
+      "platform": "LinkedIn",
+      "handle": "nipun-murlidharan",
+      "url": "https://www.linkedin.com/in/nipun-murlidharan/"
+    }
+  ],
+  "achievements": []
+}
