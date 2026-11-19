@@ -5,6 +5,16 @@
 // Both share the same look: cel-banded light, halftone shading, blue grade, grain and vignette.
 // Each canvas only renders while its screens are showing; without WebGL the CSS scenes stay.
 (function () {
+  // one source of truth for the room: templated into the shader and shared with the page
+  const G = window.sceneGeo = {
+    K: .34, OX: -.2, DEPTH: .982, REV: .955, SILL: -.44, HEAD: .52, FR: .035, GLL: .035, GLR: .6,
+    FLOOR: -.82, EYE: -.25, ZW: 4., TANE: 1.5, SHX: .35,
+    ROW0: .32, ROWSTEP: .44, COLSTEP: .72, DW: .36, DD: .2, DH: .16, CURTW: .34,
+    DESKH: .3, BK_X0: -.6, BK_X1: -.12, BK_D0: .2, BK_D1: .44, BK_H: .066, BK_PULL: .1,
+    PB_GAP: .12, PB_W: .95, PB_Y0: -.3, PB_Y1: .42,
+  };
+  for (const k in G) G[k] = Number(G[k]);
+  const f = (v) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
   const VERT = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
 
   const COMMON = `
@@ -13,6 +23,9 @@ uniform vec2 uRes;
 uniform float uTime;
 uniform vec2 uMouse;
 uniform float uScale;
+uniform vec4 uCam;      // camera: xy pan, z zoom, w roll in radians (night scene)
+uniform vec3 uSpot;     // hover glow in wall-plane coords: x, y, intensity
+uniform vec4 uBook;     // book-stack menu: count, selected (0 = top book), pull-out amount, unused
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float noise(vec2 p){
   vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3. - 2. * f);
@@ -112,39 +125,87 @@ float craters(vec2 p){
   return c;
 }
 
-// The window is a plane turned away to the right: a projective map gives true convergence
-// toward a vanishing point VP. The frame has depth: its back edges are the same shapes
-// pulled toward VP, so the strip between front and back silhouettes is the inner side face.
-const float K = .34;          // strength of the perspective
-const float OX = -.2;         // where the plane faces the viewer squarely
-const float DEPTH = .982;     // < 1: how far back the frame's rear edges sit (subtle)
+// ---- room geometry (constants come from GEO in JS, so the page can align with the shader) ----
+// The wall is a plane turned away to the right: a projective map gives true convergence toward VP.
+const float K = ${f(G.K)}, OX = ${f(G.OX)}, DEPTH = ${f(G.DEPTH)}, REV = ${f(G.REV)};
+const float SILL = ${f(G.SILL)}, HEAD = ${f(G.HEAD)}, FR = ${f(G.FR)}, GLL = ${f(G.GLL)}, GLR = ${f(G.GLR)};
+const float FLOORY = ${f(G.FLOOR)}, EYE = ${f(G.EYE)}, ZW = ${f(G.ZW)}, TANE = ${f(G.TANE)}, SHX = ${f(G.SHX)};
+const float ROW0 = ${f(G.ROW0)}, ROWSTEP = ${f(G.ROWSTEP)}, COLSTEP = ${f(G.COLSTEP)}, DW = ${f(G.DW)}, DD = ${f(G.DD)}, DH = ${f(G.DH)};
+const float CURTW = ${f(G.CURTW)};
 vec2 VP(){ return vec2(OX + 1. / K, -.02); }
 vec2 winSpace(vec2 p){ float dd = 1. - K * (p.x - OX); return vec2(p.x - OX, p.y) / dd; }
-vec2 backSpace(vec2 p){ return winSpace(VP() + (p - VP()) / DEPTH); }
-float barsW(vec2 w, float px, out float edge){
-  float hw = .028, hh = .032, m = 0.; edge = 0.;
-  // place the frame relative to what is visible, so any aspect ratio frames the moon
+vec2 backSpaceD(vec2 p, float d){ return winSpace(VP() + (p - VP()) / d); }
+vec2 backSpace(vec2 p){ return backSpaceD(p, DEPTH); }
+// glass x-extent, from the wall coordinates of the screen edges at the home framing
+vec2 glassX(){
   float aH = .5 * uRes.x / uRes.y;
   float wl = winSpace(vec2(-aH, 0.)).x, wr = winSpace(vec2(aH, 0.)).x;
-  for (int i = 0; i < 3; i++) {
-    float xs = mix(wl, wr, .2 + .3 * float(i));
+  return vec2(mix(wl, wr, GLL), mix(wl, wr, GLR));
+}
+float xCenter(){ vec2 g = glassX(); return mix(g.x, g.y, .5); }
+// 1 inside the glass rect grown by pad (anti-aliased)
+float rectM(vec2 w, vec2 g, float pad, float px){
+  return smoothstep(g.x - pad - px, g.x - pad, w.x) * (1. - smoothstep(g.y + pad, g.y + pad + px, w.x))
+       * smoothstep(SILL - pad - px, SILL - pad, w.y) * (1. - smoothstep(HEAD + pad, HEAD + pad + px, w.y));
+}
+float barsW(vec2 w, float px, out float edge){
+  vec2 g = glassX();
+  float hw = .026, hh = .03, m = 0.; edge = 0.;
+  float inG = rectM(w, g, 0., px);
+  for (int i = 0; i < 2; i++) {
+    float xs = mix(g.x, g.y, (float(i) + 1.) / 3.);
     float dx = abs(w.x - xs);
-    m = max(m, 1. - smoothstep(hw, hw + px, dx));
-    edge = max(edge, 1. - smoothstep(0., px * 1.6, abs(dx - hw * .8)));
+    m = max(m, (1. - smoothstep(hw, hw + px, dx)) * inG);
+    edge = max(edge, (1. - smoothstep(0., px * 1.6, abs(dx - hw * .8))) * inG);
   }
   float dy = abs(w.y + .05);
-  m = max(m, 1. - smoothstep(hh, hh + px, dy));
-  edge = max(edge, 1. - smoothstep(0., px * 1.6, abs(dy - hh * .8)));
-  m = max(m, smoothstep(.52 - px, .52, w.y));                 // head of the frame
-  float jamb = mix(wl, wr, .035);
-  m = max(m, 1. - smoothstep(jamb, jamb + px, w.x));           // wall/jamb on the near side
+  m = max(m, (1. - smoothstep(hh, hh + px, dy)) * inG);
+  edge = max(edge, (1. - smoothstep(0., px * 1.6, abs(dy - hh * .8))) * inG);
+  m = max(m, rectM(w, g, FR, px) * (1. - inG));               // outer frame around the glass
   return m;
 }
 float bars(vec2 p, float px, out float edge){ return barsW(winSpace(p), px, edge); }
+// objects in the room: footprint X (lateral) × D (distance in front of the wall), heights H above the floor
+float scD(float D){ return ZW / (ZW - D); }
+float yAt(float H, float D){ return EYE + (FLOORY + H - EYE) * scD(D); }
+float xAt(float X, float D){ return xCenter() + (X - xCenter()) * scD(D); }
+float band(float v, float a, float b, float px){ return smoothstep(a - px, a, v) * (1. - smoothstep(b, b + px, v)); }
+float rectBand(vec2 w, float x0, float x1, float y0, float y1, float px){ return band(w.x, x0, x1, px) * band(w.y, y0, y1, px); }
+// an axis-aligned box: front face + top (top only shows below eye level), moonlit rim on the front-top edge
+void box(inout vec3 col, vec2 w, float px, float x0, float x1, float d0, float d1, float h0, float h1, vec3 faceC, vec3 topC, float rimK){
+  float xc = xCenter();
+  float sF = scD(d1), sB = scD(d0);
+  float fx0 = xAt(x0, d1), fx1 = xAt(x1, d1);
+  float yb = yAt(h0, d1), yt = yAt(h1, d1), ytb = yAt(h1, d0);
+  float face = band(w.x, fx0, fx1, px) * band(w.y, yb, yt, px);
+  float tt = clamp((w.y - yt) / (ytb - yt + 1e-5), 0., 1.);
+  float st = mix(sF, sB, tt);
+  float top = band(w.x, xc + (x0 - xc) * st, xc + (x1 - xc) * st, px) * band(w.y, yt, ytb, px);
+  float rim = (1. - smoothstep(0., px * 2., abs(w.y - yt))) * band(w.x, fx0, fx1, px);
+  col = mix(col, faceC, face);
+  col = mix(col, topC, top);
+  col = mix(col, topC * 1.5 + vec3(.12, .22, .45), rim * rimK);
+}
+// book-stack menu: book i counts up from the desk; small deterministic offsets so it looks hand-stacked
+const float DESKH = ${f(G.DESKH)}, BK_X0 = ${f(G.BK_X0)}, BK_X1 = ${f(G.BK_X1)}, BK_D0 = ${f(G.BK_D0)}, BK_D1 = ${f(G.BK_D1)}, BK_H = ${f(G.BK_H)}, BK_PULL = ${f(G.BK_PULL)};
+float bookOff(float i){ return .022 * sin(i * 2.7 + 1.); }
+float bookTrim(float i){ return .035 * (.5 + .5 * sin(i * 1.9 + .5)); }
+// floor: wall-plane coords below the floor line → (lateral X, distance D in front of the wall)
+vec2 floorXD(vec2 w){
+  float sc = (w.y - EYE) / (FLOORY - EYE);
+  return vec2(xCenter() + (w.x - xCenter()) / sc, ZW * (1. - 1. / sc));
+}
+
+// camera with parallax: depth 0 = infinitely far (sky), 1 = the window frame
+vec2 camP(vec2 q, float depth){
+  float a = uCam.w * depth; float c = cos(a), s = sin(a);
+  return mat2(c, s, -s, c) * q / mix(1., uCam.z, depth) + uCam.xy * depth;
+}
 
 void main(){
   vec2 fc = gl_FragCoord.xy;
-  vec2 p = (fc - .5 * uRes) / uRes.y;
+  vec2 p0 = (fc - .5 * uRes) / uRes.y;
+  vec2 p = camP(p0, .25);                   // sky + moon move least
   float px = 1.5 / uRes.y;
   float aspectHalf = .5 * uRes.x / uRes.y;
   float t = uTime;
@@ -199,7 +260,7 @@ void main(){
   col += vec3(.3, .5, 1.) * (exp(-halo * 9.) * .38 + exp(-halo * 2.6) * .1) * breath;
 
   // ---------- clouds ----------
-  vec2 cpar = p + uMouse * .025;
+  vec2 cpar = camP(p0, .55) + uMouse * .025;
   vec2 cp = cpar * vec2(1.5, 3.4) + vec2(t * .018, 0.);
   float warp = fbm(cp * .6 + vec2(0., t * .01));
   float c1 = fbm(cp + warp * 1.4);
@@ -215,7 +276,11 @@ void main(){
   col = mix(col, ccol, dens * .88);
 
   // ---------- light shafts through the glass ----------
-  vec2 fpar = p + uMouse * .05;
+  vec2 fpar = camP(p0, 1.) + uMouse * .05;
+  vec2 fw = winSpace(fpar);
+  vec2 gx = glassX();
+  float inGlass = rectM(fw, gx, 0., px);
+  float inWin = rectM(fw, gx, FR, px);
   float e0;
   float frameHere = bars(fpar, px, e0);
   vec2 toM = (mc + uMouse * .05) - fpar;
@@ -229,17 +294,16 @@ void main(){
   }
   rays /= 22.;
   rays *= .8 + .2 * noise(fpar * 35. + t * .3);
-  col += vec3(.22, .42, 1.) * rays * .32 * (1. - frameHere);
+  col += vec3(.22, .42, 1.) * rays * .32 * (1. - frameHere) * inGlass;
 
-  // glass sheen: faint diagonal streaks
   float sheen = smoothstep(.985, 1., sin((fpar.x + fpar.y * .6) * 9. + 1.3)) * .06 + smoothstep(.993, 1., sin((fpar.x + fpar.y * .6) * 23.)) * .04;
-  col += vec3(.6, .8, 1.) * sheen * (1. - frameHere);
+  col += vec3(.6, .8, 1.) * sheen * (1. - frameHere) * inGlass;
 
   // ---------- window frame (front faces + inner side faces) ----------
   float glowAt = exp(-length(fpar - mc) * 1.3);
   float eb;
   float backHere = barsW(backSpace(fpar), px, eb);
-  float side = backHere * (1. - frameHere);
+  float side = backHere * (1. - frameHere) * rectM(fw, gx, FR + .02, px);
   vec3 sideCol = mix(vec3(.02, .05, .17), vec3(.12, .26, .62), glowAt * .9);
   sideCol = mix(sideCol, sideCol * .55, halftone(fc, .45, 5.));
   col = mix(col, sideCol, side);
@@ -249,27 +313,178 @@ void main(){
   fcol += vec3(.35, .6, 1.) * e1 * glowAt * .9;
   col = mix(col, fcol, frameHere);
 
-  // ---------- curtain (right) ----------
-  float cx = fpar.x - (aspectHalf - (portrait ? .12 : .3) + .025 * sin(fpar.y * 3. + t * .6));
-  float curtain = smoothstep(0., px * 2., cx);
-  float folds = .5 + .5 * sin(cx * 58. + sin(fpar.y * 2.2 + t * .45) * 2.4);
-  folds = pow(folds, 1.6);
-  float clight = exp(-length(fpar - mc) * 1.2);
-  vec3 kcol = mix(vec3(.01, .02, .08), vec3(.08, .18, .5), folds * (.25 + .9 * clight));
-  kcol += vec3(.3, .5, 1.) * (1. - smoothstep(0., .015, cx)) * clight * .6;   // lit leading edge
-  col = mix(col, kcol, curtain);
+  // ---------- room ----------
+  vec2 wc = vec2(mix(gx.x, gx.y, .45), .05);
+  float glowW = exp(-length((fw - wc) * vec2(.7, 1.)) * 1.1);    // moonlight spilling from the window
+  float onFloor = smoothstep(FLOORY + px, FLOORY - px, fw.y);
+  // wall, with a chair rail and halftone deepening away from the light
+  vec3 wcol = mix(vec3(.02, .045, .15), vec3(.08, .17, .44), glowW);
+  float rail = FLOORY + .24;
+  wcol *= mix(.82, 1., smoothstep(rail - px, rail + px, fw.y));
+  wcol += vec3(.12, .24, .55) * (1. - smoothstep(0., px * 2.5, abs(fw.y - rail))) * (.25 + .6 * glowW);
+  wcol = mix(wcol, wcol * .6, halftone(fc, (1. - glowW) * .65, 6.));
+  col = mix(col, wcol, (1. - inWin) * (1. - onFloor));
+  // recess: the opening's back edge sits deeper, showing its inner faces
+  float reveal = rectM(backSpaceD(fpar, REV), gx, FR, px) * (1. - inWin) * (1. - onFloor);
+  vec3 revCol = mix(vec3(.04, .09, .26), vec3(.2, .36, .8), glowW);
+  col = mix(col, mix(revCol, revCol * .7, halftone(fc, .4, 5.)), reveal);
 
-  // ---------- sill / foreground ----------
-  const float SILL = -.44;
-  vec2 fw = winSpace(fpar), bw = backSpace(fpar);
-  float sillFront = smoothstep(SILL + px, SILL - px, fw.y);
-  float sillTop = smoothstep(SILL + px, SILL - px, bw.y) * (1. - sillFront);
-  vec3 topCol = mix(vec3(.04, .09, .26), vec3(.2, .36, .78), glowAt);
-  topCol = mix(topCol, topCol * .7, halftone(fc, .35, 5.));
-  col = mix(col, topCol, sillTop);
-  vec3 scol = mix(vec3(.008, .018, .06), vec3(.03, .06, .18), smoothstep(-.6, SILL, fw.y));
-  scol += vec3(.35, .55, 1.) * (1. - smoothstep(0., px * 2., abs(fw.y - SILL))) * .6 * glowAt;
-  col = mix(col, scol, sillFront);
+  // sill ledge under the frame
+  float sx0 = gx.x - FR - .05, sx1 = gx.y + FR + .05, sTop = SILL - FR;
+  float inSx = smoothstep(sx0 - px, sx0, fw.x) * (1. - smoothstep(sx1, sx1 + px, fw.x));
+  vec2 bwS = backSpaceD(fpar, .955);
+  float sillTop = inSx * smoothstep(sTop + px, sTop - px, bwS.y) * smoothstep(sTop - px, sTop + px, fw.y) * (1. - inWin);
+  float sillFront = inSx * smoothstep(sTop + px, sTop - px, fw.y) * smoothstep(sTop - .065 - px, sTop - .065 + px, fw.y);
+  vec3 topCol = mix(vec3(.05, .11, .3), vec3(.24, .42, .86), glowAt);
+  col = mix(col, mix(topCol, topCol * .72, halftone(fc, .35, 5.)), sillTop);
+  vec3 sfc = vec3(.01, .024, .08) + vec3(.35, .55, 1.) * (1. - smoothstep(0., px * 2., abs(fw.y - sTop))) * .6 * glowAt;
+  col = mix(col, sfc, sillFront);
+
+  // curtains: a wide one hanging right of the window, a narrow one on the left; rod above
+  float cTop = HEAD + FR + .12;
+  float hang = smoothstep(FLOORY + .03 - px, FLOORY + .03 + px, fw.y) * (1. - smoothstep(cTop, cTop + px, fw.y));
+  float cxr = fw.x - (gx.y + FR) - .015 * sin(fw.y * 3. + t * .6);
+  float cxl = (gx.x - FR) - fw.x + .012 * sin(fw.y * 3.3 + t * .5);
+  float curR = smoothstep(0., px * 2., cxr) * (1. - smoothstep(CURTW, CURTW + px * 2., cxr)) * hang;
+  float curL = smoothstep(0., px * 2., cxl) * (1. - smoothstep(CURTW * .45, CURTW * .45 + px * 2., cxl)) * hang;
+  float clight = exp(-length(fpar - mc) * 1.2);
+  float foldR = pow(.5 + .5 * sin(cxr * 46. + sin(fw.y * 2.2 + t * .45) * 2.2), 1.6);
+  float foldL = pow(.5 + .5 * sin(cxl * 52. + sin(fw.y * 2.6 + t * .4) * 2.), 1.6);
+  vec3 kR = mix(vec3(.01, .02, .08), vec3(.08, .18, .5), foldR * (.25 + .9 * clight));
+  kR += vec3(.3, .5, 1.) * (1. - smoothstep(0., .015, cxr)) * clight * .6;
+  vec3 kL = mix(vec3(.01, .02, .08), vec3(.08, .18, .5), foldL * (.25 + .9 * clight));
+  kL += vec3(.3, .5, 1.) * (1. - smoothstep(0., .012, cxl)) * clight * .6;
+  col = mix(col, kR, curR);
+  col = mix(col, kL, curL);
+  float rod = (1. - smoothstep(.006, .006 + px, abs(fw.y - cTop))) * smoothstep(gx.x - FR - CURTW * .5, gx.x - FR - CURTW * .45, fw.x) * (1. - smoothstep(gx.y + FR + CURTW + .03, gx.y + FR + CURTW + .05, fw.x));
+  col = mix(col, vec3(.1, .2, .5) * (.4 + glowW), rod);
+
+  // floor: planks, moonlight pools cast by the panes, a hover pool, and desks
+  if (fw.y < FLOORY + .5) {
+    vec2 F = floorXD(fw);                       // X lateral, D distance from the wall
+    vec3 flo = mix(vec3(.008, .02, .075), vec3(.03, .07, .2), exp(-F.y * .9) * (.4 + .6 * glowW));
+    flo *= .85 + .15 * smoothstep(.0, .06, abs(fract(F.y * 3.5) - .5));       // plank seams
+    vec2 wp = vec2(F.x - F.y * SHX, FLOORY + F.y * TANE);                     // window point lighting this spot
+    float ep;
+    float pool = rectM(wp, gx, 0., .01) * (1. - barsW(wp, .01, ep)) * exp(-F.y * .55);
+    flo += vec3(.3, .55, 1.) * pool * .95;
+    flo = mix(flo, flo + vec3(.2, .38, .8) * .5, halftone(fc + 2., pool * .8, 6.) * pool);
+    flo = mix(flo, flo * .6, halftone(fc, (1. - pool) * .5, 7.));
+    col = mix(col, flo, onFloor);
+
+    // rug under the chair
+    float rug = smoothstep(1., .96, length((F - vec2(xCenter() - .02, .78)) / vec2(.62, .3)));
+    vec3 rugC = mix(vec3(.03, .07, .2), vec3(.06, .13, .34), .5 + .5 * sin(F.x * 30.)) * (.7 + .5 * pool);
+    col = mix(col, mix(rugC, rugC * .6, halftone(fc + 4., .45, 5.)), rug * onFloor);
+  }
+
+  // ---------- a lived-in desk under the window ----------
+  {
+    float xc = xCenter();
+    float lampX = xc + .5, lampD = .24;
+    float dh = .3;                                              // desk height
+    // lamp light: a soft cyan pool on the desk and the wall behind it
+    vec2 lampW = vec2(xAt(lampX - .12, .3), yAt(dh, .3));
+    float lampGlow = exp(-length((fw - lampW) * vec2(1., 1.7)) * 4.2);
+    col += vec3(.35, .6, 1.) * lampGlow * .28 * (1. - inGlass);
+    vec3 deskTop = vec3(.07, .15, .4) + vec3(.25, .45, .95) * lampGlow * .5;
+    vec3 deskFace = vec3(.012, .03, .1);
+    // legs, then the top slab
+    box(col, fw, px, xc - .62, xc - .58, .12, .5, 0., dh - .03, deskFace, deskFace, 0.);
+    box(col, fw, px, xc + .58, xc + .62, .12, .5, 0., dh - .03, deskFace, deskFace, 0.);
+    box(col, fw, px, xc - .64, xc + .64, .1, .52, dh - .035, dh, mix(deskFace, deskFace * .6, halftone(fc, .5, 5.)), mix(deskTop, deskTop * .78, halftone(fc, .3, 5.)), .9);
+    // drawer unit on the left
+    box(col, fw, px, xc - .6, xc - .32, .14, .5, .02, dh - .035, vec3(.02, .045, .14), vec3(.04, .09, .25), .4);
+    float dyy = yAt(.17, .5);
+    col = mix(col, vec3(.15, .3, .7), (1. - smoothstep(0., px * 1.5, abs(fw.y - dyy))) * band(fw.x, xAt(xc - .6, .5), xAt(xc - .32, .5), px) * .7);
+    // loose papers lying on the desk top (found by inverting the desk-top plane)
+    {
+      float sc = (fw.y - EYE) / (FLOORY + dh - EYE);
+      vec2 T = vec2(xc + (fw.x - xc) / sc, ZW * (1. - 1. / sc));      // X, D on the desk top
+      float onTop = band(T.y, .1, .52, .002) * band(T.x, xc - .64, xc + .64, .002) * step(fw.y, yAt(dh, .1) + .001);
+      for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        vec2 cen = vec2(xc - .02 + fi * .13, .4 + .035 * sin(fi * 2.1));
+        float th = -.35 + fi * .32;
+        vec2 q = T - cen;
+        q = vec2(q.x * cos(th) - q.y * sin(th), q.x * sin(th) + q.y * cos(th));
+        float sheet = band(q.x, -.07, .07, .002) * band(q.y, -.05, .05, .002) * onTop;
+        float lines = step(.55, fract(q.y * 90.)) * band(q.x, -.055, .045 - .03 * hash(vec2(floor(q.y * 90.), fi)), .001) * band(q.y, -.04, .035, .001);
+        vec3 pc = mix(vec3(.55, .65, .88), vec3(.75, .84, 1.), glowW * .5 + lampGlow * .6) - vec3(.25, .25, .2) * lines;
+        col = mix(col, mix(pc, pc * .8, halftone(fc, .25, 4.)), sheet);
+      }
+    }
+    // shut laptop with a small glowing logo
+    box(col, fw, px, xc + .02, xc + .34, .14, .34, dh, dh + .022, vec3(.04, .09, .25), vec3(.1, .2, .48), .7);
+    vec2 logo = vec2(xAt(xc + .18, .24), yAt(dh + .022, .24));
+    col += vec3(.5, .8, 1.) * exp(-length((fw - logo) * vec2(1., 3.)) * 140.) * .8;
+    // the menu: a stack of books, spines facing the room; the selected one slides out
+    for (int i = 0; i < 8; i++) {
+      float fi = float(i);
+      if (fi >= uBook.x) break;
+      float item = uBook.x - 1. - fi;                        // item 0 is the top book
+      float isSel = 1. - step(.5, abs(item - uBook.y));
+      float x0 = BK_X0 + bookOff(fi), x1 = BK_X1 + bookOff(fi) - bookTrim(fi);
+      float h0 = DESKH + fi * BK_H, h1 = h0 + BK_H * .93;
+      float d1 = BK_D1 + isSel * uBook.z * BK_PULL;
+      float m4 = mod(fi, 4.);
+      vec3 spine = m4 < .5 ? vec3(.05, .12, .36) : m4 < 1.5 ? vec3(.1, .25, .64) : m4 < 2.5 ? vec3(.04, .26, .42) : vec3(.16, .36, .74);
+      spine = mix(spine, vec3(.86, .92, 1.), isSel * .9);
+      box(col, fw, px, xc + x0, xc + x1, BK_D0, d1, h0, h1, mix(spine, spine * .78, halftone(fc + fi, .3, 5.)), vec3(.7, .78, .95), .5);
+      float fx0 = xAt(xc + x0, d1), fx1 = xAt(xc + x1, d1);
+      float stripe = band(fw.x, fx0 + (fx1 - fx0) * .03, fx0 + (fx1 - fx0) * .07, px) * band(fw.y, yAt(h0, d1), yAt(h1, d1), px);
+      col = mix(col, vec3(.9, .07, .17), stripe * isSel);
+    }
+    // mug with steam
+    box(col, fw, px, xc + .36, xc + .42, .36, .41, dh, dh + .06, vec3(.6, .72, .92), vec3(.75, .85, 1.), .2);
+    vec2 mugTop = vec2(xAt(xc + .39, .41), yAt(dh + .06, .41));
+    float steamY = fw.y - mugTop.y;
+    float steam = (1. - smoothstep(.002, .002 + px, abs(fw.x - mugTop.x - .012 * sin(steamY * 40. - t * 2.)))) * band(steamY, .005, .12, px) * (1. - steamY / .12);
+    col += vec3(.5, .7, 1.) * steam * .35;
+    // desk lamp: base, stem, shade, bulb
+    box(col, fw, px, lampX - .05, lampX + .05, lampD - .03, lampD + .03, dh, dh + .015, vec3(.02, .05, .15), vec3(.12, .25, .55), .4);
+    box(col, fw, px, lampX - .008, lampX + .008, lampD - .008, lampD + .008, dh, dh + .26, vec3(.03, .07, .2), vec3(.08, .16, .4), 0.);
+    box(col, fw, px, lampX - .16, lampX + .01, lampD - .02, lampD + .02, dh + .245, dh + .275, vec3(.04, .09, .26), vec3(.1, .2, .5), .3);
+    vec2 bulb = vec2(xAt(lampX - .1, lampD + .02), yAt(dh + .24, lampD + .02));
+    col += vec3(.7, .9, 1.) * exp(-length((fw - bulb) * vec2(1., 2.)) * 60.) * .9;
+
+    // chair, pushed out to the side as if someone just got up
+    vec3 chF = vec3(.01, .025, .08), chT = vec3(.05, .11, .3);
+    float cx0 = xc + .42;
+    box(col, fw, px, cx0 + .1, cx0 + .13, .62, .65, 0., .16, chF, chF, 0.);
+    box(col, fw, px, cx0 - .04, cx0 + .27, .55, .72, .015, .028, chF, chT, .2);
+    box(col, fw, px, cx0 - .02, cx0 + .25, .52, .74, .16, .195, vec3(.02, .045, .14), vec3(.08, .17, .42), .6);
+    box(col, fw, px, cx0 - .01, cx0 + .24, .72, .755, .195, .4, mix(vec3(.02, .05, .16), vec3(.02, .05, .16) * .6, halftone(fc + 3., .5, 5.)), vec3(.1, .2, .5), .8);
+  }
+
+  // ---------- plant on the windowsill ----------
+  {
+    float sx = gx.x + .12, sh0 = SILL - FR - FLOORY;               // sill height above the floor
+    box(col, fw, px, sx - .045, sx + .045, .0, .06, sh0, sh0 + .07, vec3(.15, .3, .7), vec3(.2, .38, .8), .3);
+    vec2 pl = vec2(xAt(sx, .03), yAt(sh0 + .07, .03));
+    for (int i = 0; i < 6; i++) {
+      float ang = -1.2 + float(i) * .48 + .05 * sin(t * .7 + float(i));
+      vec2 dir = vec2(sin(ang), cos(ang));
+      vec2 q = fw - pl - dir * .055;
+      vec2 lq = vec2(dot(q, vec2(dir.y, -dir.x)), dot(q, dir));
+      float leaf = smoothstep(1., .88, length(lq / vec2(.017, .06)));
+      col = mix(col, mix(vec3(.04, .2, .3), vec3(.2, .6, .65), .35 + .6 * glowAt), leaf);
+    }
+  }
+
+  // ---------- pinboard on the wall right of the window (the facts are pinned here) ----------
+  {
+    float px0 = gx.y + FR + CURTW + ${f(G.PB_GAP)}, px1 = px0 + ${f(G.PB_W)}, py0 = ${f(G.PB_Y0)}, py1 = ${f(G.PB_Y1)};
+    float frameB = rectBand(fw, px0, px1, py0, py1, px);
+    float inner = rectBand(fw, px0 + .025, px1 - .025, py0 + .025, py1 - .025, px);
+    vec3 cork = mix(vec3(.03, .07, .2), vec3(.06, .13, .34), noise(fw * 60.) * .6 + glowW * .4);
+    cork = mix(cork, cork * .65, halftone(fc + 5., .5, 4.));
+    col = mix(col, vec3(.08, .17, .42) + vec3(.1, .2, .45) * glowW, frameB * (1. - inner));
+    col = mix(col, cork, inner);
+  }
+
+  // hover glow from the page (wall-plane coords)
+  col += vec3(.3, .55, 1.) * uSpot.z * exp(-length(fw - uSpot.xy) * 9.) * .35;
 
   // ---------- grade ----------
   float lum = dot(col, vec3(.3, .5, .2));
@@ -312,7 +527,7 @@ void main(){
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = { res: gl.getUniformLocation(prog, 'uRes'), time: gl.getUniformLocation(prog, 'uTime'),
-      mouse: gl.getUniformLocation(prog, 'uMouse'), scale: gl.getUniformLocation(prog, 'uScale') };
+      mouse: gl.getUniformLocation(prog, 'uMouse'), scale: gl.getUniformLocation(prog, 'uScale'), cam: gl.getUniformLocation(prog, 'uCam'), spot: gl.getUniformLocation(prog, 'uSpot'), book: gl.getUniformLocation(prog, 'uBook') };
 
     // below native resolution: the art is soft and stylised, and this keeps it cheap
     let scale = 1;
@@ -336,6 +551,12 @@ void main(){
       gl.uniform1f(U.time, still ? 12 : (now - t0) / 1000);
       gl.uniform2f(U.mouse, mouse.x, mouse.y);
       gl.uniform1f(U.scale, scale);
+      const c = window.sceneCam || { x: 0, y: 0, z: 1 };
+      gl.uniform4f(U.cam, c.x, c.y, c.z, c.r || 0);
+      const sp = window.sceneSpot || { x: 0, y: 0, z: 0 };
+      gl.uniform3f(U.spot, sp.x, sp.y, sp.z);
+      const bk = window.sceneBooks || { n: 0, sel: -1, pull: 0 };
+      gl.uniform4f(U.book, bk.n, bk.sel, bk.pull, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       drewStill = true;
     }
@@ -350,6 +571,7 @@ void main(){
     target.x = (e.clientX / innerWidth - .5) * 2;
     target.y = -(e.clientY / innerHeight - .5) * 2;
   });
+  window.sceneMouse = mouse;   // shared so page elements can follow the same parallax
   (function ease() { mouse.x += (target.x - mouse.x) * .05; mouse.y += (target.y - mouse.y) * .05; requestAnimationFrame(ease); })();
   const t0 = performance.now();
 
