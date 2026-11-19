@@ -379,8 +379,8 @@ function wallToScreen(wx, wy) {
 }
 // room point (lateral X, distance D from the wall, height H above the floor) → wall-plane → screen
 function roomToWall(X, D, H) {
-  const G = window.sceneGeo, xc = xC(), sc = G.ZW / (G.ZW - D);
-  return [xc + (X - xc) * sc, G.EYE + (G.FLOOR + H - G.EYE) * sc];
+  const G = window.sceneGeo, ex = xC() + G.EYEX, sc = G.ZW / (G.ZW - D);   // converge toward the viewer, as in scene.js
+  return [ex + (X - ex) * sc, G.EYE + (G.FLOOR + H - G.EYE) * sc];
 }
 const roomToScreen = (X, D, H) => { const w = roomToWall(X, D, H); return wallToScreen(w[0], w[1]); };
 // map an element's w×h box onto a screen quad
@@ -410,43 +410,42 @@ function spineQuad(item) {
   const d1 = G.BK_D1 + (item === homeSel ? window.sceneBooks.pull : 0) * G.BK_PULL;
   return [roomToScreen(x0, d1, h1), roomToScreen(x1, d1, h1), roomToScreen(x1, d1, h0), roomToScreen(x0, d1, h0)];
 }
-function pinboard() {
+function wallPanel() {
   const G = window.sceneGeo, x0 = gX()[1] + G.FR + G.CURTW + G.PB_GAP;
   return { x0, x1: x0 + G.PB_W, y0: G.PB_Y0, y1: G.PB_Y1 };
+}
+// foreground board: a free-standing panel near the camera, its right edge closer than its left
+function boardQuad() {
+  const xc = xC(), XL = xc + .78, XR = xc + 1.38, DL = 1.0, DR = 1.85, HB = .06, HT = .86;
+  return [roomToScreen(XL, DL, HT), roomToScreen(XR, DR, HT), roomToScreen(XR, DR, HB), roomToScreen(XL, DL, HB)];
 }
 
 function buildRoom(items, socials, p) {
   bound = [];
   const kids = [];
-  // name cast faintly on the wall under the pinboard
+  // name cast faintly high on the wall, right of the window
   const cast = h('div', { class: 'rm namecast', 'aria-hidden': 'true' }, h('b', null, (p.name || '').toUpperCase()), p.headline ? h('small', null, p.headline) : null);
   kids.push(cast);
-  bound.push({ el: cast, w: 1000, h: 170, quad: () => { const b = pinboard(); return wallQuad(b.x0 - .08, b.x1 + .5, -.7, -.4); } });
-  // facts pinned on the board, 2 × 2, each a little askew
+  bound.push({ el: cast, w: 1000, h: 170, quad: () => { const b = wallPanel(); return wallQuad(b.x0 - .05, b.x0 + 1.05, .38, .6); } });
+  // wall clock beside it
+  const clock = h('div', { class: 'rm clock', 'aria-label': 'Local time' }, h('i', { class: 'hand hh' }), h('i', { class: 'hand mm' }), h('i', { class: 'hand ss' }), h('b', { class: 'pin' }));
+  kids.push(clock);
+  bound.push({ el: clock, w: 200, h: 200, quad: () => { const b = wallPanel(); return wallQuad(b.x0 + 1.15, b.x0 + 1.43, .36, .62); } });
+  // corkboard leaning in the right foreground, turned toward the room; the facts are pinned on it
   const notes = items.slice(0, socials.length ? 3 : 4).map(([k, v, sub, sectionId, href]) => ({ k, v, sub, sectionId, href }));
   if (socials.length) notes.push({ k: 'Socials', socials });
-  notes.forEach((n, i) => {
+  const noteEls = notes.map((n, i) => {
     const inner = [h('span', { class: 'nk' }, n.k),
       n.socials ? h('span', { class: 'nchips' }, n.socials.map((s) => { const href = safeUrl(s.url); return href ? h('a', { class: 'chip', href, target: '_blank', rel: 'noopener noreferrer', title: s.platform, 'aria-label': s.platform }, mono(s.platform)) : null; }))
                 : h('span', { class: 'nv' }, n.v, n.sub ? h('small', null, n.sub) : null)];
-    const el = n.href ? h('a', { class: 'rm note', href: n.href }, ...inner)
-      : n.socials ? h('div', { class: 'rm note' }, ...inner)
-      : h('button', { class: 'rm note', type: 'button', onclick: () => roomDolly(() => goSection(n.sectionId)) }, ...inner);
-    const col = i % 2, row = Math.floor(i / 2), rot = [-.05, .04, .03, -.04][i];
-    const quad = () => {
-      const b = pinboard(), cw = (b.x1 - b.x0 - .1) / 2, ch = (b.y1 - b.y0 - .1) / 2;
-      const x0 = b.x0 + .05 + col * cw + .02, y1 = b.y1 - .05 - row * ch - .02;
-      return wallQuad(x0, x0 + cw - .04, y1 - ch + .05, y1, rot);
-    };
-    el.addEventListener('pointerenter', () => { const b = pinboard(); spotTarget = { x: b.x0 + .05 + (col + .5) * (b.x1 - b.x0 - .1) / 2, y: b.y1 - .05 - (row + .5) * (b.y1 - b.y0 - .1) / 2, z: 1 }; });
-    el.addEventListener('pointerleave', () => { spotTarget = { ...spotTarget, z: 0 }; });
-    kids.push(el);
-    bound.push({ el, w: 300, h: 190, quad });
+    const style = `--rot:${[-1.6, 1.2, -.8, 1.5][i]}deg`;
+    if (n.href) return h('a', { class: 'note', href: n.href, style }, ...inner);
+    if (n.socials) return h('div', { class: 'note', style }, ...inner);
+    return h('button', { class: 'note', type: 'button', style, onclick: () => roomDolly(() => goSection(n.sectionId)) }, ...inner);
   });
-  // wall clock right of the board
-  const clock = h('div', { class: 'rm clock', 'aria-label': 'Local time' }, h('i', { class: 'hand hh' }), h('i', { class: 'hand mm' }), h('i', { class: 'hand ss' }), h('b', { class: 'pin' }));
-  kids.push(clock);
-  bound.push({ el: clock, w: 200, h: 200, quad: () => { const b = pinboard(); return wallQuad(b.x1 + .1, b.x1 + .42, .08, .4); } });
+  const board = h('div', { class: 'rm board' }, h('span', { class: 'board-title' }, 'About me'), h('div', { class: 'board-notes' }, ...noteEls));
+  kids.push(board);
+  bound.push({ el: board, w: 560, h: 720, quad: boardQuad });
   // the menu: one label per book spine (top book = first option)
   homeItems.forEach((it, item) => {
     const el = h('button', { class: 'rm spine' + (item === homeSel ? ' sel' : ''), type: 'button',
@@ -542,7 +541,7 @@ function showPress() {
 // Press → title: like the game's opening, the camera eases back and pans across the room while the
 // prompt slides away and the title elements arrive. The shader gives the move real parallax.
 const CAM_PRESS = { x: -.13, y: .06, z: 1.42, r: -.09 };   // close in on the moon, slightly rolled
-const CAM_HOME = { x: .26, y: -.2, z: .68, r: 0 };   // pulled back: window, wall panel, floor and desks
+const CAM_HOME = { x: .2, y: -.2, z: .68, r: 0 };   // pulled back: window, wall panel, floor and desks
 window.sceneCam = { ...CAM_HOME };
 const easeInOut = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 // whip: lingers, snaps through the middle, overshoots a touch and settles
