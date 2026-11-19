@@ -198,6 +198,38 @@ async function bubbles(mid) {
   bubbles.t = setTimeout(() => { sp.classList.remove('go'); sp.replaceChildren(); }, 2500);
 }
 
+// ================= ring transition (first load only) =================
+// Concentric discs bloom from the centre until they cover the screen, `mid` swaps the scene, then an
+// iris opens from the centre (an animated mask) with outline ripples riding its edge.
+const RING_MID = 900;     // ms: the last disc has landed and the screen is covered
+async function rings(mid) {
+  const sp = $('#splash');
+  const lite = body.classList.contains('lite');
+  const R = Math.hypot(innerWidth, innerHeight) / 2 + 4;          // centre to corner
+  const n = lite ? 5 : 7;
+  // inner → outer; every other band gets a halftone screen or a pale outline
+  const palette = ['#030a2c', '#1636d6', '#071650', '#2f62e6', '#0b2196', '#3cd0ff', '#06175e'];
+  const wrap = h('div', { class: 'rings' });
+  for (let i = 0; i < n; i++) {
+    const kind = i % 3 === 2 ? ' dotted' : i % 2 === 1 ? ' lined' : '';
+    wrap.append(h('i', { class: 'disc' + (lite ? '' : kind), style:
+      `--f:${((i + 1) / n * (i === n - 1 ? 1.02 : 1)).toFixed(3)};--i:${i};--d:${i * (lite ? 90 : 70)}ms;background-color:${palette[i % palette.length]}` }));
+  }
+  if (!lite) {
+    wrap.append(h('i', { class: 'spin', style: '--f:.62' }), h('i', { class: 'spin rev', style: '--f:.34' }));
+  }
+  const edges = (lite ? [0] : [0, 90, 200]).map((d) => h('i', { class: 'ring-edge', style: `--d:${d}ms` }));
+  sp.style.setProperty('--R', R.toFixed(0) + 'px');
+  sp.replaceChildren(wrap, ...edges);
+  sp.classList.add('rings-mode');
+  void sp.offsetWidth;
+  sp.classList.add('go');
+  await sleep(RING_MID);
+  await mid();
+  clearTimeout(bubbles.t);
+  bubbles.t = setTimeout(() => { sp.classList.remove('go', 'rings-mode'); sp.replaceChildren(); }, 1000);
+}
+
 // ================= lite mode =================
 // fewer effects, no WebGL: chosen automatically on modest hardware, togglable by anyone
 const LITE_KEY = 'portfolio-lite';
@@ -702,7 +734,7 @@ $('#tagbox').addEventListener('click', () => { if (state === 'menu') goHome(); }
   refreshVisible();
   const start = sectionIndex(hash);
   busy = true;
-  await bubbles(() => {
+  await rings(() => {
     if (start >= 0) {
       sel = start; buildMenu(false); renderSub(); setState('sub'); setGuide(visible[sel].ask);
     } else if (hash === 'menu') {

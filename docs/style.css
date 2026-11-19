@@ -655,3 +655,34 @@ body.lite .marq { animation-duration: 14s; }
 /* PRESS ANY KEY: a solid blue copy, masked to the moon's disc, keeps it readable over the bright moon */
 .press-blue { position: absolute; left: 0; pointer-events: none; color: #1636d6; -webkit-text-fill-color: #1636d6; -webkit-text-stroke: 2px #1636d6; text-shadow: none; }
 body.st-press .press-blue { animation: pressPulse 2.2s ease-in-out infinite; }
+
+/* ================= RING TRANSITION (first load) ================= */
+@property --hole { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.rings { position: absolute; inset: 0; --hole: 0px;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent var(--hole), #000 calc(var(--hole) + 1px));
+          mask-image: radial-gradient(circle at 50% 50%, transparent var(--hole), #000 calc(var(--hole) + 1px)); }
+.splash.go .rings { animation: ringHole .7s cubic-bezier(.62, 0, .3, 1) calc(var(--mid, 900ms) + 40ms) forwards; }
+@keyframes ringHole { to { --hole: var(--R); } }
+.rings i { position: absolute; left: 50%; top: 50%; display: block; border-radius: 50%;
+  width: calc(var(--R) * 2 * var(--f)); height: calc(var(--R) * 2 * var(--f)); }
+/* discs: inner ones sit on top, so the stack reads as bands growing outward */
+.rings .disc { z-index: calc(20 - var(--i)); transform: translate(-50%, -50%) scale(0); }
+.splash.go .rings .disc { animation: discGrow .44s cubic-bezier(.2, .8, .3, 1) var(--d) forwards; }
+@keyframes discGrow { to { transform: translate(-50%, -50%) scale(1); } }
+.rings .disc.lined { box-shadow: inset 0 0 0 2px rgba(200, 242, 255, .9), inset 0 0 0 7px rgba(200, 242, 255, .12); }
+.rings .disc.dotted { background-image: var(--dots-light); background-size: 8px 8px; }
+/* thin dashed rings spinning while the stack builds */
+.rings .spin { z-index: 30; border: 2px dashed rgba(190, 236, 255, .75); transform: translate(-50%, -50%) scale(0); }
+.splash.go .rings .spin { animation: spin 2.4s linear .15s forwards; }
+.rings .spin.rev { border-style: dotted; border-width: 3px; }
+.splash.go .rings .spin.rev { animation: spinRev 2.2s linear .25s forwards; }
+/* one pass each: grow in over the first ~20%, keep turning until the iris has opened */
+@keyframes spin { 0% { transform: translate(-50%, -50%) scale(0) rotate(0); } 20% { transform: translate(-50%, -50%) scale(1) rotate(60deg); } 100% { transform: translate(-50%, -50%) scale(1) rotate(300deg); } }
+@keyframes spinRev { 0% { transform: translate(-50%, -50%) scale(0) rotate(0); } 20% { transform: translate(-50%, -50%) scale(1) rotate(-70deg); } 100% { transform: translate(-50%, -50%) scale(1) rotate(-330deg); } }
+/* outline ripples riding the opening iris (same timing as the mask) */
+.ring-edge { position: absolute; left: 50%; top: 50%; display: block; border-radius: 50%; width: calc(var(--R) * 2); height: calc(var(--R) * 2);
+  border: 3px solid #c8f2ff; box-shadow: 0 0 18px rgba(99, 220, 255, .6), inset 0 0 18px rgba(99, 220, 255, .4);
+  transform: translate(-50%, -50%) scale(0); opacity: 0; }
+.splash.go .ring-edge { animation: ringEdge .7s cubic-bezier(.62, 0, .3, 1) calc(var(--mid, 900ms) + 40ms + var(--d)) forwards; }
+@keyframes ringEdge { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0); } 80% { opacity: .9; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); } }
+.ring-edge + .ring-edge { border-width: 2px; border-color: rgba(200, 242, 255, .7); }
