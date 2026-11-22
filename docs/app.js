@@ -177,10 +177,6 @@ async function bubbles(mid) {
   for (let i = 0; i < (lite ? 8 : 20); i++) {
     surge.append(h('i', { class: 'finger', style: `left:${rnd(70, 205)}vmax;width:${rnd(2.5, 7)}vmax;height:${rnd(28, 75)}vh` }));
   }
-  // pink shards thrown off the leading edge
-  for (let i = 0; i < (lite ? 0 : 12); i++) {
-    surge.append(h('i', { class: 'shard3', style: `left:${rnd(70, 205)}vmax;--s:${rnd(14, 34)}px;--r:${rnd(-50, 50)}deg;margin-top:${-rnd(0, 18)}vh` }));
-  }
   // scalloped trailing edge
   for (let x = 40; x < 260; x += lite ? 16 : 10) {
     const w = rnd(14, 24);
@@ -198,7 +194,6 @@ async function bubbles(mid) {
   sp.classList.add('go');
   await sleep(SURGE_MID);               // column now covers the whole screen
   await mid();
-  if (state !== 'home' && state !== 'press') { window.sceneCam = { ...CAM_HOME }; camTarget = null; }
   clearTimeout(bubbles.t);
   bubbles.t = setTimeout(() => { sp.classList.remove('go'); sp.replaceChildren(); }, 2500);
 }
@@ -218,11 +213,10 @@ async function rings(mid) {
   for (let i = 0; i < n; i++) {
     const kind = i % 3 === 2 ? ' dotted' : i % 2 === 1 ? ' lined' : '';
     wrap.append(h('i', { class: 'disc' + (lite ? '' : kind), style:
-      `--f:${((i + 1) / n * (i === n - 1 ? 1.02 : 1)).toFixed(3)};--in:${(i / (i + 1)).toFixed(3)};--i:${i};--d:${i * (lite ? 90 : 70)}ms;background-color:${palette[i % palette.length]}` }));
+      `--f:${((i + 1) / n * (i === n - 1 ? 1.02 : 1)).toFixed(3)};--i:${i};--d:${i * (lite ? 90 : 70)}ms;background-color:${palette[i % palette.length]}` }));
   }
   if (!lite) {
-    wrap.append(h('i', { class: 'spin', style: '--f:.62' }), h('i', { class: 'spin rev', style: '--f:.34' }),
-      h('i', { class: 'ticks', style: '--f:.8' }), h('i', { class: 'arc', style: '--f:.47' }), h('i', { class: 'arc arc2', style: '--f:.93' }));
+    wrap.append(h('i', { class: 'spin', style: '--f:.62' }), h('i', { class: 'spin rev', style: '--f:.34' }));
   }
   const edges = (lite ? [0] : [0, 90, 200]).map((d) => h('i', { class: 'ring-edge', style: `--d:${d}ms` }));
   sp.style.setProperty('--R', R.toFixed(0) + 'px');
@@ -261,7 +255,7 @@ function setLite(on, remember) {
 async function goHome() {
   if (busy || state === 'home') return;
   busy = true;
-  await bubbles(() => { window.sceneCam = { ...CAM_HOME }; camTarget = { ...CAM_HOME }; renderHome(); setState('home'); setHash(''); });
+  await bubbles(() => { renderHome(); setState('home'); setHash(''); });
   setTimeout(() => $('#title-menu .tm.sel')?.focus({ preventScroll: true }), 300);
   busy = false;
 }
@@ -330,178 +324,19 @@ function renderHome() {
   $('#glance-list').replaceChildren(...rowsEl);
 
   // title menu, bottom right
-  homeItems = [{ label: 'Start', act: () => roomDolly(goMenu) }, ...visible.map((s) => ({ label: s.label, act: () => roomDolly(() => goSection(s.id)) }))];
+  homeItems = [{ label: 'Start', act: goMenu }, ...visible.map((s) => ({ label: s.label, act: () => goSection(s.id) }))];
   homeSel = Math.min(homeSel, homeItems.length - 1);
   $('#title-menu').replaceChildren(...homeItems.map((it, i) => h('button', { class: 'tm', type: 'button', style: `--i:${i}`,
     onpointermove: (e) => { if (state === 'home' && homeSel !== i && realMove(e)) selectHome(i); },
     onclick: () => { if (state !== 'home') return; selectHome(i); it.act(); } }, h('span', null, it.label))));
-  buildRoom(items, socials, p);
   selectHome(homeSel, true);
 }
 
 function selectHome(i, quiet) {
-  const prev = homeSel;
   homeSel = (i + homeItems.length) % homeItems.length;
-  if (prev !== homeSel) window.sceneBooks.pull = 0;        // the newly chosen book slides out from flush
-  roomLayer.querySelectorAll('.spine').forEach((b, j) => b.classList.toggle('sel', j === homeSel));
-  if (roomOn()) lookAt();
   $('#title-menu').querySelectorAll('.tm').forEach((b, j) => { b.classList.toggle('sel', j === homeSel); b.setAttribute('aria-current', j === homeSel ? 'true' : 'false'); });
   if (!quiet) $('#title-menu').querySelectorAll('.tm')[homeSel]?.focus({ preventScroll: true });
 }
-
-// ================= room: the title screen lives inside the scene =================
-// Page elements are mapped onto surfaces of the shader's room with a matrix3d homography, using the same
-// geometry (window.sceneGeo) and camera (window.sceneCam, sceneMouse) as scene.js, so they stay glued on.
-const roomLayer = $('#room-layer');
-let bound = [];                                  // { el, w, h, quad: () => 4 screen points (tl, tr, br, bl) }
-let camTarget = null;                            // eased camera target while on the title screen
-let spotTarget = { x: 0, y: 0, z: 0 };
-window.sceneBooks = { n: 0, sel: -1, pull: 0 };
-window.sceneSpot = { x: 0, y: 0, z: 0 };
-
-function roomOn() {
-  return state === 'home' && !body.classList.contains('lite') && $('.night').classList.contains('gl-on') && innerWidth >= 860 && !!window.sceneGeo;
-}
-function gX() {
-  const G = window.sceneGeo, aH = innerWidth / innerHeight / 2;
-  const ws = (x) => (x - G.OX) / (1 - G.K * (x - G.OX));
-  const wl = ws(-aH), wr = ws(aH);
-  return [wl + (wr - wl) * G.GLL, wl + (wr - wl) * G.GLR];
-}
-const xC = () => { const g = gX(); return (g[0] + g[1]) / 2; };
-// wall-plane point → screen px (inverse of winSpace, then of camP at depth 1)
-function wallToScreen(wx, wy) {
-  const G = window.sceneGeo, c = window.sceneCam, m = window.sceneMouse || { x: 0, y: 0 };
-  const u = wx / (1 + G.K * wx), dd = 1 - G.K * u;
-  const ax = (u + G.OX - c.x - m.x * .05) * c.z, ay = (wy * dd - c.y - m.y * .05) * c.z;
-  const r = -(c.r || 0), qx = Math.cos(r) * ax - Math.sin(r) * ay, qy = Math.sin(r) * ax + Math.cos(r) * ay;
-  return [innerWidth / 2 + qx * innerHeight, innerHeight / 2 - qy * innerHeight];
-}
-// room point (lateral X, distance D from the wall, height H above the floor) → wall-plane → screen
-function roomToWall(X, D, H) {
-  const G = window.sceneGeo, xc = xC(), sc = G.ZW / (G.ZW - D);
-  return [xc + (X - xc) * sc, G.EYE + (G.FLOOR + H - G.EYE) * sc];
-}
-const roomToScreen = (X, D, H) => { const w = roomToWall(X, D, H); return wallToScreen(w[0], w[1]); };
-// map an element's w×h box onto a screen quad
-function mapQuad(el, w, h, q) {
-  const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
-  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
-  const den = dx1 * dy2 - dx2 * dy1;
-  if (!den) return;
-  const g = (dx3 * dy2 - dx2 * dy3) / den, hh = (dx1 * dy3 - dx3 * dy1) / den;
-  const A = x1 - x0 + g * x1, B = x3 - x0 + hh * x3, D = y1 - y0 + g * y1, E = y3 - y0 + hh * y3;
-  el.style.transform = `matrix3d(${A / w},${D / w},0,${g / w},${B / h},${E / h},0,${hh / h},0,0,1,0,${x0},${y0},0,1)`;
-}
-const wallQuad = (x0, x1, y0, y1, rot = 0) => {
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, c = Math.cos(rot), s = Math.sin(rot);
-  return [[x0, y1], [x1, y1], [x1, y0], [x0, y0]].map(([x, y]) => {
-    const dx = x - cx, dy = y - cy;
-    return wallToScreen(cx + dx * c - dy * s, cy + dx * s + dy * c);
-  });
-};
-// book geometry: identical formulas to scene.js
-const bookOff = (i) => .022 * Math.sin(i * 2.7 + 1);
-const bookTrim = (i) => .035 * (.5 + .5 * Math.sin(i * 1.9 + .5));
-function spineQuad(item) {
-  const G = window.sceneGeo, n = window.sceneBooks.n, i = n - 1 - item, xc = xC();
-  const x0 = xc + G.BK_X0 + bookOff(i), x1 = xc + G.BK_X1 + bookOff(i) - bookTrim(i);
-  const h0 = G.DESKH + i * G.BK_H, h1 = h0 + G.BK_H * .93;
-  const d1 = G.BK_D1 + (item === homeSel ? window.sceneBooks.pull : 0) * G.BK_PULL;
-  return [roomToScreen(x0, d1, h1), roomToScreen(x1, d1, h1), roomToScreen(x1, d1, h0), roomToScreen(x0, d1, h0)];
-}
-function pinboard() {
-  const G = window.sceneGeo, x0 = gX()[1] + G.FR + G.CURTW + G.PB_GAP;
-  return { x0, x1: x0 + G.PB_W, y0: G.PB_Y0, y1: G.PB_Y1 };
-}
-
-function buildRoom(items, socials, p) {
-  bound = [];
-  const kids = [];
-  // name cast faintly on the wall under the pinboard
-  const cast = h('div', { class: 'rm namecast', 'aria-hidden': 'true' }, h('b', null, (p.name || '').toUpperCase()), p.headline ? h('small', null, p.headline) : null);
-  kids.push(cast);
-  bound.push({ el: cast, w: 1000, h: 170, quad: () => { const b = pinboard(); return wallQuad(b.x0 - .08, b.x1 + .5, -.7, -.4); } });
-  // facts pinned on the board, 2 × 2, each a little askew
-  const notes = items.slice(0, socials.length ? 3 : 4).map(([k, v, sub, sectionId, href]) => ({ k, v, sub, sectionId, href }));
-  if (socials.length) notes.push({ k: 'Socials', socials });
-  notes.forEach((n, i) => {
-    const inner = [h('span', { class: 'nk' }, n.k),
-      n.socials ? h('span', { class: 'nchips' }, n.socials.map((s) => { const href = safeUrl(s.url); return href ? h('a', { class: 'chip', href, target: '_blank', rel: 'noopener noreferrer', title: s.platform, 'aria-label': s.platform }, mono(s.platform)) : null; }))
-                : h('span', { class: 'nv' }, n.v, n.sub ? h('small', null, n.sub) : null)];
-    const el = n.href ? h('a', { class: 'rm note', href: n.href }, ...inner)
-      : n.socials ? h('div', { class: 'rm note' }, ...inner)
-      : h('button', { class: 'rm note', type: 'button', onclick: () => roomDolly(() => goSection(n.sectionId)) }, ...inner);
-    const col = i % 2, row = Math.floor(i / 2), rot = [-.05, .04, .03, -.04][i];
-    const quad = () => {
-      const b = pinboard(), cw = (b.x1 - b.x0 - .1) / 2, ch = (b.y1 - b.y0 - .1) / 2;
-      const x0 = b.x0 + .05 + col * cw + .02, y1 = b.y1 - .05 - row * ch - .02;
-      return wallQuad(x0, x0 + cw - .04, y1 - ch + .05, y1, rot);
-    };
-    el.addEventListener('pointerenter', () => { const b = pinboard(); spotTarget = { x: b.x0 + .05 + (col + .5) * (b.x1 - b.x0 - .1) / 2, y: b.y1 - .05 - (row + .5) * (b.y1 - b.y0 - .1) / 2, z: 1 }; });
-    el.addEventListener('pointerleave', () => { spotTarget = { ...spotTarget, z: 0 }; });
-    kids.push(el);
-    bound.push({ el, w: 300, h: 190, quad });
-  });
-  // wall clock right of the board
-  const clock = h('div', { class: 'rm clock', 'aria-label': 'Local time' }, h('i', { class: 'hand hh' }), h('i', { class: 'hand mm' }), h('i', { class: 'hand ss' }), h('b', { class: 'pin' }));
-  kids.push(clock);
-  bound.push({ el: clock, w: 200, h: 200, quad: () => { const b = pinboard(); return wallQuad(b.x1 + .1, b.x1 + .42, .08, .4); } });
-  // the menu: one label per book spine (top book = first option)
-  homeItems.forEach((it, item) => {
-    const el = h('button', { class: 'rm spine' + (item === homeSel ? ' sel' : ''), type: 'button',
-      onpointermove: (e) => { if (state === 'home' && homeSel !== item && realMove(e)) selectHome(item); },
-      onclick: () => { if (state !== 'home') return; selectHome(item); it.act(); } }, h('span', null, it.label));
-    kids.push(el);
-    bound.push({ el, w: 520, h: 72, quad: () => spineQuad(item) });
-  });
-  roomLayer.replaceChildren(...kids);
-  window.sceneBooks.n = homeItems.length;
-}
-
-// look-at: the camera leans toward the selected book
-function lookAt() {
-  const i = window.sceneBooks.n - 1 - homeSel;
-  camTarget = { x: CAM_HOME.x - .03, y: CAM_HOME.y + .004 + i * .006, z: CAM_HOME.z + .015, r: 0 };
-}
-// dolly-in on confirm: push toward the books, then let the transition take over mid-move
-let dollying = false;
-async function roomDolly(go) {
-  if (!roomOn() || matchMedia('(prefers-reduced-motion: reduce)').matches) return go();
-  if (dollying || busy) return;
-  dollying = true;
-  const i = window.sceneBooks.n - 1 - homeSel;
-  camTarget = { x: CAM_HOME.x - .16, y: CAM_HOME.y - .06 + i * .012, z: .95, r: 0 };
-  await sleep(260);
-  dollying = false;
-  go();
-}
-
-function setHands() {
-  const now = new Date(), s = now.getSeconds(), m = now.getMinutes() + s / 60, hr = (now.getHours() % 12) + m / 60;
-  const c = roomLayer.querySelector('.clock');
-  if (!c) return;
-  c.style.setProperty('--h', hr * 30 + 'deg');
-  c.style.setProperty('--m', m * 6 + 'deg');
-  c.style.setProperty('--s', s * 6 + 'deg');
-}
-
-(function roomTick() {
-  requestAnimationFrame(roomTick);
-  const on = roomOn();
-  body.classList.toggle('room-on', on);
-  if (!on) { window.sceneBooks.n = 0; return; }       // no unlabeled books in the flat layouts
-  const bk = window.sceneBooks;
-  bk.n = homeItems.length; bk.sel = homeSel; bk.pull += (1 - bk.pull) * .16;
-  if (camTarget && !window.camTweening) {
-    const c = window.sceneCam, k = dollying ? .14 : .06;
-    window.sceneCam = { x: c.x + (camTarget.x - c.x) * k, y: c.y + (camTarget.y - c.y) * k, z: c.z + (camTarget.z - c.z) * k, r: (c.r || 0) + ((camTarget.r || 0) - (c.r || 0)) * k };
-  }
-  const sp = window.sceneSpot;
-  window.sceneSpot = { x: spotTarget.x, y: spotTarget.y, z: sp.z + (spotTarget.z - sp.z) * .12 };
-  for (const b of bound) mapQuad(b.el, b.w, b.h, b.quad());
-  setHands();
-})();
 
 // first screen of a visit: "press any key" over the night window
 // The moon sits where the night shader draws it (same constants as scene.js), or where the CSS moon is
@@ -511,10 +346,7 @@ function moonDisc() {
   if (!gl) { const m = $('.moon').getBoundingClientRect(); return { x: m.left + m.width / 2, y: m.top + m.height / 2, r: m.width / 2 }; }
   const W = innerWidth, H = innerHeight, portrait = W < H;
   const mc = portrait ? [-.05, .2] : [-.2, .19], R = portrait ? .2 : .25;
-  const c = window.sceneCam, zs = 1 + (c.z - 1) * .25, ang = (c.r || 0) * .25;   // inverse of camP(p, .25)
-  const qx = (mc[0] - c.x * .25) * zs, qy = (mc[1] - c.y * .25) * zs;
-  const sx = Math.cos(ang) * qx - Math.sin(ang) * qy, sy = Math.sin(ang) * qx + Math.cos(ang) * qy;
-  return { x: W / 2 + sx * H, y: H / 2 - sy * H, r: R * zs * H };
+  return { x: W / 2 + mc[0] * H, y: H / 2 - mc[1] * H, r: R * H };
 }
 function updatePressMask() {
   const big = $('#press-big'), blue = $('#press-blue');
@@ -529,7 +361,6 @@ function updatePressMask() {
 addEventListener('resize', () => { if (state === 'press') updatePressMask(); });
 
 function showPress() {
-  window.sceneCam = { ...CAM_PRESS };
   const touch = matchMedia('(hover: none)').matches;
   $('#press-small').textContent = data.profile?.name ? `${data.profile.name} · Portfolio` : 'Portfolio';
   $('#press-big').replaceChildren(...(touch ? ['TAP', 'TO', 'START'] : ['PRESS', 'ANY', 'KEY']).flatMap((w, i) => i ? [h('br'), w] : [w]));
@@ -539,42 +370,12 @@ function showPress() {
   setTimeout(updatePressMask, 400);
   setTimeout(updatePressMask, 1200);
 }
-// Press → title: like the game's opening, the camera eases back and pans across the room while the
-// prompt slides away and the title elements arrive. The shader gives the move real parallax.
-const CAM_PRESS = { x: -.13, y: .06, z: 1.42, r: -.09 };   // close in on the moon, slightly rolled
-const CAM_HOME = { x: .26, y: -.2, z: .68, r: 0 };   // pulled back: window, wall panel, floor and desks
-window.sceneCam = { ...CAM_HOME };
-const easeInOut = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-// whip: lingers, snaps through the middle, overshoots a touch and settles
-const backOut = (u, c = 1.25) => 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2);
-const easeWhip = (t) => (t < .5 ? 16 * t ** 5 : .5 + .5 * backOut((t - .5) * 2));
-function tweenCam(to, ms, ease) {
-  const from = { ...window.sceneCam }, t0 = performance.now();
-  window.camTweening = true;
-  return new Promise((done) => {
-    (function step() {
-      const k = Math.min(1, (performance.now() - t0) / ms), e = (ease || easeInOut)(k);
-      window.sceneCam = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e, z: from.z + (to.z - from.z) * e, r: (from.r || 0) + ((to.r || 0) - (from.r || 0)) * e };
-      if (state === 'press' || body.classList.contains('press-out')) updatePressMask();
-      if (k < 1) setTimeout(step, 16); else { window.camTweening = false; done(); }
-    })();
-  });
-}
 async function leavePress() {
   if (state !== 'press' || busy) return;
   busy = true;
   try { sessionStorage.setItem('seenPress', '1'); } catch {}
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  body.classList.add('press-out');                 // prompt skews away, soft light streak
-  const move = tweenCam(CAM_HOME, still ? 1 : 1900, easeInOut);   // camera pulls back to reveal the room
-  await sleep(still ? 0 : 700);
-  renderHome(); setState('home'); setHash('');
-  body.classList.remove('press-out');
-  body.classList.add('pan-in');                    // title elements arrive as the room opens up
-  await move;
-  camTarget = { ...CAM_HOME };
-  setTimeout(() => body.classList.remove('pan-in'), 700);
-  $('#title-menu .tm.sel')?.focus({ preventScroll: true });
+  await bubbles(() => { renderHome(); setState('home'); setHash(''); });
+  setTimeout(() => $('#title-menu .tm.sel')?.focus({ preventScroll: true }), 300);
   busy = false;
 }
 ['keydown', 'pointerdown'].forEach((ev) => document.addEventListener(ev, (e) => {
