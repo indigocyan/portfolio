@@ -1,0 +1,21 @@
+/* Idle motion and reduced-motion overrides. Screen-to-screen choreography lives in main.js
+   (Web Animations API) so it can overlap and be awaited. */
+
+/* the selected menu word breathes slightly */
+.ci.sel .ci-word { animation: breathe 2.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.14) translateX(.1em); } }
+
+/* rows lift a hair on hover even before they are selected */
+.card:not(.sel):hover, .sk-row:not(.sel):hover, .ev-row:not(.sel):hover, .plate:not(.sel):hover .plate-val { background: rgba(23, 71, 224, .7); }
+
+/* page leaving: keep it above the incoming one only while it fades */
+.page.leaving { z-index: 0; }
+
+/* reduced motion: setting from the System screen or the OS */
+.reduced .drift .bub, .reduced .drift .shard, .reduced .clouds i, .reduced .stars, .reduced .clock,
+.reduced .ci.sel .ci-word, .reduced .ci.sel .ci-shard, .reduced .sk-row.sel .sk-meter i.on,
+.reduced .sea-css i { animation: none !important; }
+.reduced .ci-band, .reduced .ci-shard, .reduced .ci-word, .reduced .sys-slash, .reduced .sys-word,
+.reduced .plate-val, .reduced .card, .reduced .sk-row, .reduced .qrow, .reduced .ev-row, .reduced .dir-row { transition-duration: .01s !important; }
+.reduced .drift .shard { opacity: .35; }
+.reduced .card.sel::after, .reduced .sk-row.sel::after, .reduced .ev-row.sel::after, .reduced .qrow.sel::after, .reduced .dir-row.sel::after, .reduced .plate.sel .plate-val::after { display: none; }

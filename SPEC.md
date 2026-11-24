@@ -1,0 +1,156 @@
+# Portfolio — technical spec
+
+A personal portfolio whose navigation borrows the *menu language* of Persona 3 Reload:
+oceanic blue, italic condensed type stacked on a diagonal, a red/white "cursor" slash, giant
+outlined screen titles, a white header bar with left/right section tabs, a guide line and button
+prompts in the corner. It is inspired by the game, not a copy: no game assets, logos, characters,
+fonts, text or screen layouts are reproduced. Where the game shows a character, this site shows the
+owner's name as a typographic figure.
+
+## 1. Hosting and constraints
+
+| Item | Decision |
+| --- | --- |
+| Host | GitHub Pages, branch `main`, folder `/docs` → `https://indigocyan.github.io/portfolio/` |
+| Build step | None. Plain HTML, CSS and ES modules, served as-is. |
+| Dependencies | None at runtime. Google Fonts only (display face from §3, Barlow Semi Condensed for text). |
+| Routing | Hash routes (`#/menu`, `#/skills`, …) so deep links work on a static host without a 404 trick. |
+| Content | One file, `docs/content.json`. Edit it and push; nothing else changes. |
+| Local preview | `python3 -m http.server 8080 --directory docs` (configured in `.claude/launch.json`). |
+| Browsers | Last two versions of Chrome, Edge, Firefox, Safari (desktop and mobile). WebGL optional. |
+| Budget | ≤ 150 KB of our own HTML/CSS/JS (uncompressed, excl. fonts and images); first paint < 1 s on 4G. |
+
+The previous build (local Node server, owner-only editor, LinkedIn importer) is removed.
+Its content is carried over into `content.json`.
+
+## 2. File layout
+
+```
+docs/
+  index.html            shell: layers for every screen, noscript fallback, meta/OG tags
+  content.json          all portfolio data (schema in §6)
+  css/base.css          tokens, type, backdrop fallback, date panel, guide, shared components
+  css/screens.css       title, menu, section chrome and every section layout, mobile rules
+  css/motion.css        idle motion and reduced-motion overrides
+  js/main.js            boot, title, menu, section pages, router + transition choreography, input
+  js/screens/sections.js one renderer per section + the section registry
+  js/list.js            shared list selection (hover, click, touch, keyboard, focus)
+  js/sea.js             WebGL backdrop with moods per screen (CSS fallback without WebGL)
+  js/util.js            DOM helpers, animation wrapper, dates, moon phase, settings
+  fonts.html            typeface showcase (not linked from search engines)
+  favicon.svg, apple-touch-icon.png, og-image.png
+```
+For layout testing, `?data=<file>.json` loads another JSON file from `docs/` instead of `content.json`.
+
+## 3. Visual language (tokens)
+
+- **Colour**: abyss `#020b3a`, deep `#0a2a9e`, sea `#1747e0`, cyan `#43d3ff`, foam `#d8f6ff`,
+  white, ink `#05060c`, signal red `#ff1f3d`, coral pink `#ff6fb5` (accents only).
+- **Type**: two faces in pairs. The display face (`--display`) sets titles and menu words in a heavy
+  condensed italic, all caps; the default is Sofia Sans Extra Condensed (very tall, sharp cuts,
+  true italic). Small labels (tabs, dates, prompts, tags, the guide line) always use Fira Sans
+  Extra Condensed (`--label`) so they stay crisp whichever display face is chosen. Visitors can
+  cycle 14 display faces under System → Typeface; `fonts.html` shows each one paired with the
+  label face (each card links to `./?font=<key>`). Barlow Semi Condensed 400–600 for body text.
+  The registry is `FONTS` in `js/util.js`; add a family there to offer it.
+- **Shapes**: parallelograms (skewX −14°), torn slashes (clip-path polygons), halftone dots
+  (radial-gradient screens), thin offset outlines on giant titles.
+- **Depth**: three planes — the sea backdrop (canvas), a mid plane of drifting shards and
+  bubbles, and the UI. Each screen nudges the backdrop's camera so the world feels continuous.
+
+## 4. Screens
+
+| Screen | Game reference (the feel, not the layout) | Content |
+| --- | --- | --- |
+| Home (title) | Title screen: moon through a window | Night sky, a shaded full moon (lit sphere, maria, rimmed craters, cel terminator with halftone) seen through an angled window, an inclined clock-face ring orbiting it (back half behind the moon, near half in front), drifting clouds, name logotype, one option per section, social links. The camera pulls back from the moon on entry; planes shift with the pointer by depth |
+| Profile | Party status plates | Name, headline, location, pronouns, about |
+| Skills | Social-stat meters | Skill name, 10-segment meter, rank word |
+| Education / Experience | Bond-card list + detail card | Numbered skewed cards, rank = years, detail card |
+| Projects | Request board table | No., title, year, status/link, task box |
+| Timeline | Calendar with a giant month number | Month grid, dated events, ◀ ▶ month |
+| Contact | Shop directory in black/white/red | Email, phone, socials; Enter opens |
+| System | Giant black rotated word, blue disc | Motion setting, effects quality, return to title, source |
+
+There is no separate menu screen: Home lists the sections directly, and Esc in a section returns
+Home. Every section screen has a **tab strip** listing all sections; a slanted ink indicator slides to
+the current tab. Number keys 1–9 jump straight to a section from Home, the menu or any section.
+
+Sections with no data are hidden from the menu (Profile and System always show).
+Empty slots inside a list render as dashed placeholder rows, like unfilled slots in a game menu.
+
+A top-right **date panel** shows the visitor's local date, weekday, time of day
+(Morning / Daytime / Evening / Late Night) and the real current moon phase.
+
+## 5. Motion and transitions
+
+Goal: the site never "cuts". One persistent page; every screen change is choreographed.
+
+- **One world**: the backdrop canvas never unmounts; on each route it tweens camera offset,
+  tint and light-ray angle over ~900 ms, so the background is mid-motion while the UI swaps.
+- **Overlap, not sequence**: the outgoing screen's exit and the incoming screen's entrance
+  overlap by ~40 %. No blank frames.
+- **Choreography** (Web Animations API, so animations are interruptible and awaitable):
+  - Startup: dark screen, a thin line of light draws across the middle, the dark splits open on it
+    while the camera pulls back from the moon (four planes at different zoom), the clock face winds
+    in, then the name drops in letter by letter and the options cascade.
+  - Home ↔ Section (the dive): everything radiates from a source point (the chosen option, or the
+    Home button on the way back). Tapered jets and droplets branch out from it, a pool of water
+    with light rays floods outward behind a foam ring with a spiky splash fringe until it covers
+    the screen; the scene swaps; then a hole opens at the same point and drains outward with its
+    own foam ring while bubbles drift up. On return the camera settles back from the moon.
+  - After the dive: the header bar drops in, the giant title assembles, rows stagger in.
+  - Section ↔ Section (Q / E or header tabs): content slides out one way and in from the other;
+    the giant title cross-slides; the header bar stays put.
+  - Choosing an option: the word pops and a burst of glass-like shards flies out of it.
+  - Jumps of more than one section: a heavier ink/cyan slash crosses while pages slide.
+  - Giant titles assemble letter by letter, with an offset red echo outline behind.
+  - Tab strip: the indicator slides between tabs and the strip scrolls the tab into view.
+  - Menu selection: the cursor shard snaps in with a kick; the word recoils.
+  - Row selection: a gloss sweep crosses the selected row, the detail pane cross-fades.
+  - Idle: drifting clouds, twinkling stars, a slowly turning clock face, glowing moon,
+    breathing selection, drifting shards and bubbles underwater.
+- **Easing**: `cubic-bezier(.16,.9,.3,1)` for entrances, `cubic-bezier(.7,0,.84,0)` for exits,
+  a small overshoot for selection pops. Durations 180–650 ms; no transition blocks input longer
+  than 450 ms.
+- **Reduced motion** (`prefers-reduced-motion` or System → Motion: Reduced): all moves become
+  150 ms cross-fades, the backdrop slows and drops parallax.
+
+## 6. Content schema (`content.json`)
+
+```jsonc
+{
+  "profile":  { "name", "headline", "location", "pronouns", "about" },
+  "contact":  { "email", "phone" },
+  "socials":  [{ "platform", "handle", "url" }],
+  "skills":   [{ "name", "level" /* 1–10 */, "group" }],
+  "education":[{ "school", "degree", "field", "start", "end", "description" }],
+  "experience":[{ "title", "company", "location", "start", "end", "description" }],
+  "projects": [{ "name", "year", "status", "link", "description" }],
+  "timeline": [{ "date", "title", "description" }]
+}
+```
+Dates accept `2024`, `Jun 2024`, `2024-06`, `Present`. The calendar collects every dated item
+(starts/ends of education and experience, project years, timeline entries).
+
+## 7. Input and accessibility
+
+- Keyboard: ↑↓ / W S move, Enter / Space confirm, Esc / Backspace back, ← → / Q E switch section,
+  1–9 jump to a section. On Home, arrows move between the links and the Menu button.
+- Mouse: hover selects, click confirms, right-click goes back, wheel scrolls the menu.
+- Touch: tap selects then confirms; on-screen back button; layouts reflow for portrait.
+- Button prompts in the corner switch between keyboard and touch glyphs from the last input used.
+- Real `<button>`/`<a>` elements, `aria-current` on selections, a live region for the guide line,
+  focus moves with the cursor, visible focus ring, text contrast ≥ 4.5:1.
+- `<noscript>` renders the same content as a plain page; no content is canvas-only.
+
+## 8. Performance
+
+- Canvas renders at ≤ 1.5× DPR, pauses when the tab is hidden, drops to half resolution when
+  frame time exceeds 20 ms. Without WebGL, a layered CSS gradient + caustic animation takes over.
+- Only `transform` and `opacity` are animated on UI elements.
+- Fonts load with `display=swap`; the shell is usable before they arrive.
+
+## 9. Release
+
+Work happens on `main` locally and is committed; nothing is pushed until the owner approves.
+Pushing `main` publishes to Pages within about a minute.

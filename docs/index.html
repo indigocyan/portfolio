@@ -2,14 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nipun Murlidharan</title>
-  <meta name="description" content="Portfolio of Nipun Murlidharan">
-  <meta name="theme-color" content="#0d2aa8">
+  <meta name="description" content="Portfolio of Nipun Murlidharan. B.Tech, Electrical, Electronics and Communications Engineering at IIT Tirupati.">
+  <meta name="theme-color" content="#0a2a9e">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <!-- link previews (chat apps, social sites) -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Nipun Murlidharan">
   <meta property="og:title" content="Nipun Murlidharan · Portfolio">
@@ -18,80 +16,99 @@
   <meta property="og:image" content="https://indigocyan.github.io/portfolio/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Nipun Murlidharan's portfolio: a halftone moon behind a window, with the name as a logo">
+  <meta property="og:image:alt" content="Nipun Murlidharan's name set in italic condensed type on a deep blue sea, crossed by a white and red slash">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://indigocyan.github.io/portfolio/og-image.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..900;1,62..125,300..900&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans+Extra+Condensed:ital,wght@0,800;0,900;1,800;1,900&family=Fira+Sans+Extra+Condensed:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700;1,800&family=Barlow+Semi+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/screens.css">
+  <link rel="stylesheet" href="css/motion.css">
 </head>
-<body class="st-intro">
+<body data-screen="boot">
 
-  <div class="bg" aria-hidden="true">
-    <canvas id="sea-gl"></canvas>
-    <div class="water w1"></div>
-    <div class="water w2"></div>
-    <div class="rays"></div>
-    <div class="fx" id="fx"></div>
+  <!-- world: persistent across every screen -->
+  <div class="world" aria-hidden="true">
+    <div class="sea-css"><i class="c1"></i><i class="c2"></i><i class="rays"></i></div>
+    <canvas id="sea"></canvas>
+    <div class="drift" id="drift"></div>
   </div>
 
-  <div class="strip" aria-hidden="true"><div class="strip-text" id="strip-text"></div></div>
-  <button class="tagbox" id="tagbox" type="button" aria-label="Back to home"><b id="tag-name"></b><small id="tag-sub"></small><span class="tag-home">◀ HOME</span></button>
+  <main class="app" id="app">
+    <!-- HOME: moonlit window, name, the section options and socials -->
+    <section class="screen home" id="scr-title" aria-label="Home" hidden>
+      <div class="night" id="night" aria-hidden="true">
+        <div class="layer sky"><i class="stars"></i><i class="stars s2"></i></div>
+        <div class="layer moon-layer">
+          <div class="moon-glow"></div>
+          <svg class="clock back" viewBox="-100 -100 200 200"></svg>
+          <div class="moon"><i class="mare m1"></i><i class="mare m2"></i><i class="mare m3"></i><i class="crater c1"></i><i class="crater c2"></i><i class="crater c3"></i><i class="crater c4"></i><i class="crater c5"></i><i class="moon-shade"></i></div>
+          <svg class="clock front" viewBox="-100 -100 200 200"></svg>
+        </div>
+        <div class="layer clouds"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="layer frame">
+          <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+            <path fill="#020824" fill-rule="evenodd" d="M-200 -200H1800V1100H-200Z M150 70L1470 30V870L150 830Z"/>
+            <g fill="#030b2e">
+              <polygon points="588,57 620,56 620,858 588,859"/>
+              <polygon points="1030,44 1062,43 1062,866 1030,867"/>
+              <polygon points="150,328 1470,306 1470,336 150,358"/>
+              <polygon points="110,826 1510,872 1510,910 110,880"/>
+            </g>
+            <g fill="none" stroke="#7fdcff" stroke-opacity=".38" stroke-width="3">
+              <polyline points="150,70 150,830 1470,870"/>
+              <polyline points="620,62 620,330"/><polyline points="620,358 620,852"/>
+              <polyline points="1062,48 1062,308"/><polyline points="1062,336 1062,862"/>
+              <polyline points="150,358 588,351"/>
+            </g>
+            <g fill="#bfeeff" fill-opacity=".05">
+              <polygon points="170,90 560,78 300,330 170,332"/>
+              <polygon points="650,380 1000,372 760,820 650,822"/>
+            </g>
+          </svg>
+        </div>
+        <div class="layer shade"></div>
+      </div>
+      <div class="title-logo" id="title-logo">
+        <span class="tl-first" id="tl-first"></span>
+        <span class="tl-bar"><span id="tl-last"></span></span>
+        <span class="tl-sub" id="tl-sub"></span>
+      </div>
+      <nav class="opts" aria-label="Sections"><ul class="cmd-list" id="cmd-list"></ul></nav>
+      <nav class="home-links" id="home-links" aria-label="Social links"></nav>
+    </section>
 
-  <!-- HOME: title-screen style (night window, name logo, title menu) -->
-  <section class="home" id="home" aria-label="Home">
-    <div class="night" aria-hidden="true">
-      <canvas id="night-gl"></canvas>
-      <div class="moon"></div>
-      <div class="clouds"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="window"><i class="v1"></i><i class="v2"></i><i class="v3"></i><i class="h1"></i></div>
-      <div class="night-shade"></div>
-    </div>
-    <div class="press" id="press">
-      <div class="press-small" id="press-small"></div>
-      <div class="press-big" id="press-big"></div>
-      <div class="press-big press-blue" id="press-blue" aria-hidden="true"></div>
-    </div>
-    <div class="logo" id="logo" aria-hidden="true">
-      <div class="logo-top" id="logo-top"></div>
-      <div class="logo-bar"><span id="logo-bot"></span></div>
-      <div class="logo-sub" id="logo-sub"></div>
-    </div>
-    <div class="glance" id="glance"><div class="glance-list" id="glance-list"></div></div>
-    <nav class="title-menu" id="title-menu" aria-label="Title menu"></nav>
-  </section>
+    <!-- SECTION (pages are swapped inside) -->
+    <section class="screen section" id="scr-section" aria-label="Section" hidden>
+      <button class="back-btn" id="back-btn" type="button" aria-label="Back to home"><span>◀</span> Home</button>
+      <div class="hbar" id="hbar"></div>
+      <div class="pages" id="pages"></div>
+    </section>
+  </main>
 
-  <nav class="menu" aria-label="Sections"><div class="menu-rot" id="menu"></div></nav>
+  <aside class="datepanel" id="datepanel" aria-label="Today"></aside>
 
-  <div class="guide" id="guide" aria-live="polite"><span class="guide-text" id="guide-text"></span><span class="guide-label">Guide</span></div>
+  <footer class="guide" id="guide">
+    <p class="guide-text" id="guide-text" aria-live="polite"></p>
+    <div class="prompts" id="prompts"></div>
+  </footer>
 
-  <section class="sub" id="sub" aria-hidden="true">
-    <div class="sub-dark"></div>
-    <div class="sub-white"></div>
-    <div class="sub-title" id="sub-title"></div>
-    <button class="sub-back" id="sub-back" type="button">BACK</button>
-    <div class="sub-head" id="sub-head"></div>
-    <div class="sub-list" id="sub-list" role="listbox" tabindex="-1"></div>
-    <div class="sub-detail" id="sub-detail"><span class="sub-detail-tag">Details</span><div id="sub-detail-text"></div></div>
-  </section>
-
+  <div class="wipe" id="wipe" aria-hidden="true"></div>
+  <div class="shatter" id="shatter" aria-hidden="true"></div>
   <div class="splash" id="splash" aria-hidden="true"></div>
+  <div class="curtain" id="curtain" aria-hidden="true"><i class="cur-top"></i><i class="cur-bot"></i><i class="cur-line"></i></div>
 
-  <div class="owner" id="owner" hidden>
-    <span class="owner-tag">OWNER</span>
-    <button class="obtn" id="edit-toggle" type="button">EDIT</button>
-    <button class="obtn" id="import-btn" type="button" title="Import a LinkedIn data export (.zip or .csv) or a JSON backup">IMPORT</button>
-    <input type="file" id="import-file" accept=".zip,.csv,.json,application/zip,text/csv,application/json" multiple hidden>
-    <button class="obtn hot" id="save-btn" type="button" hidden>SAVE</button>
-    <button class="obtn hot" id="publish" type="button">PUBLISH</button>
-  </div>
-  <button class="lite-toggle" id="lite-toggle" type="button" aria-pressed="false" title="Fewer effects for slower devices">LITE MODE <b>OFF</b></button>
-  <div class="toast" id="toast" role="status"></div>
-  <datalist id="platforms"><option>LinkedIn</option><option>GitHub</option><option>Instagram</option><option>X</option><option>YouTube</option><option>Behance</option><option>Dribbble</option><option>Medium</option><option>LeetCode</option><option>Discord</option><option>Website</option></datalist>
+  <noscript>
+    <style>.world,.app,.datepanel,.guide,.curtain,.splash{display:none!important} body{overflow:auto!important}</style>
+    <article class="plain">
+      <h1>Nipun Murlidharan</h1>
+      <p>B.Tech, Electrical, Electronics and Communications Engineering, Indian Institute of Technology Tirupati.</p>
+      <p>Trivandrum, Kerala, India</p>
+      <p><a href="mailto:nipun.murlidharan@gmail.com">nipun.murlidharan@gmail.com</a> · <a href="https://www.linkedin.com/in/nipun-murlidharan/">LinkedIn</a></p>
+    </article>
+  </noscript>
 
-  <script src="scene.js"></script>
-  <script src="importer.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
