@@ -48,12 +48,14 @@ export function roman(n) {
 const KEY = 'portfolio-settings';
 const defaults = () => ({
   motion: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'full',
-  font: 'sofia',
+  font: 'nightswim',
   effects: (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || navigator.connection?.saveData ? 'low' : 'high',
 });
 export const settings = (() => {
   let s = defaults();
   try { Object.assign(s, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch {}
+  // font scheme v3 (own Nightswim faces): re-pick once for everyone, then respect later choices
+  if (s.fontV !== 3) { s.font = 'nightswim'; s.fontV = 3; }
   return s;
 })();
 export function saveSettings() { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {} }
@@ -142,9 +144,11 @@ export function timeOfDay(d = new Date()) {
 }
 
 // ---------------- display typefaces ----------------
-// Display faces: condensed heavy italics from Google Fonts, in the spirit of the game's menu lettering.
-// `q` is the Google Fonts css2 family query; `stretch` pins a width axis where the font has one.
+// Display faces. Nightswim is drawn for this site (tools/make_fonts.py, served from docs/fonts);
+// the rest are Google Fonts alternatives, loaded only when chosen.
+// `q` is the Google Fonts css2 family query (none for self-hosted); `stretch` pins a width axis.
 export const FONTS = {
+  nightswim: { name: 'Nightswim Display', family: "'Nightswim Display'", q: null, note: 'Drawn for this site: squared, ultra-condensed, corners cut along the slant' },
   sofia:   { name: 'Sofia Sans Extra Condensed', family: "'Sofia Sans Extra Condensed'", q: 'Sofia+Sans+Extra+Condensed:ital,wght@0,800;0,900;1,800;1,900', note: 'Very tall, sharp cuts, true italic' },
   fira:    { name: 'Fira Sans Extra Condensed', family: "'Fira Sans Extra Condensed'", q: 'Fira+Sans+Extra+Condensed:ital,wght@0,800;0,900;1,800;1,900', note: 'Crisp and technical, true italic' },
   pathway: { name: 'Pathway Extreme', family: "'Pathway Extreme'", q: 'Pathway+Extreme:ital,wdth,wght@0,75..100,800..900;1,75..100,800..900', stretch: '75%', note: 'Punchy grotesque, true italic' },
@@ -160,14 +164,14 @@ export const FONTS = {
   bigshoulders: { name: 'Big Shoulders Display', family: "'Big Shoulders Display'", q: 'Big+Shoulders+Display:wght@800;900', note: 'Narrow, angular, slanted by the browser' },
   antonio: { name: 'Antonio', family: "'Antonio'", q: 'Antonio:wght@600;700', note: 'Very narrow, slanted by the browser' },
 };
-export const DEFAULT_FONT = 'sofia';
+export const DEFAULT_FONT = 'nightswim';
 // small labels (tabs, dates, prompts, tags) always use this face, paired with the display face
-export const LABEL_FONT = { name: 'Fira Sans Extra Condensed', family: "'Fira Sans Extra Condensed'" };
-export const fontUrl = (keys) => 'https://fonts.googleapis.com/css2?' + keys.map((k) => 'family=' + FONTS[k].q).join('&') + '&display=swap';
+export const LABEL_FONT = { name: 'Nightswim Label', family: "'Nightswim Label'" };
+export const fontUrl = (keys) => 'https://fonts.googleapis.com/css2?' + keys.filter((k) => FONTS[k].q).map((k) => 'family=' + FONTS[k].q).join('&') + '&display=swap';
 export function applyFont(key) {
   const f = FONTS[key] || FONTS[DEFAULT_FONT];
   key = FONTS[key] ? key : DEFAULT_FONT;
-  if (!document.querySelector(`link[data-font="${key}"]`)) {
+  if (f.q && !document.querySelector(`link[data-font="${key}"]`)) {
     document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: fontUrl([key]) }));
     document.head.lastChild.dataset.font = key;
   }

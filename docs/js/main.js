@@ -53,8 +53,8 @@ function moonSvg(p) {
 
 const jumpKey = () => `1–${Math.min(9, sections.length)}`;
 const PROMPTS = {
-  title:   { keys: () => [['↑↓', 'Select'], ['Enter', 'Open'], [jumpKey(), 'Jump']], touch: () => [['Tap', 'Select'], ['Tap again', 'Open']] },
-  section: { keys: () => [['Q E', 'Switch'], [jumpKey(), 'Jump'], ['Esc', 'Home']], touch: () => [['Tabs', 'Jump'], ['◀', 'Home']] },
+  title:   { keys: () => [['↑↓', 'Select'], ['Enter', 'Open'], [jumpKey(), 'Jump']], touch: () => [['Tap', 'Open']] },
+  section: { keys: () => [['Q E', 'Switch'], [jumpKey(), 'Jump'], ['Esc', 'Home']], touch: () => [['Swipe', 'Switch'], ['Tap', 'Details']] },
 };
 function setGuide(text, kind = screen) {
   const g = $('#guide-text');
@@ -269,6 +269,7 @@ function buildHome() {
       }
     },
     onActivate: (i) => go(sections[i].id),
+    tapActivates: true,
   });
 }
 // mode 'intro': full pull-back from the moon; 'return': a short settle after the water clears
@@ -520,6 +521,20 @@ document.addEventListener('keydown', (e) => {
   else if (screen === 'section' && (k === 'ArrowLeft' || k === 'q' || k === 'Q')) { e.preventDefault(); switchTo(secIndex - 1); }
 });
 document.addEventListener('pointerdown', (e) => noteDevice(e.pointerType === 'mouse' ? 'keys' : 'touch'));
+// swipe left/right on a section page switches section (a clearly horizontal, quick gesture only,
+// so vertical scrolling and the tab strip / calendar keep working)
+let sw = null;
+$('#pages').addEventListener('touchstart', (e) => {
+  const t = e.touches[0];
+  sw = e.touches.length === 1 && !e.target.closest('.cal, a, input') ? { x: t.clientX, y: t.clientY, t: performance.now() } : null;
+}, { passive: true });
+$('#pages').addEventListener('touchend', (e) => {
+  if (!sw || screen !== 'section') return;
+  const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+  const quick = performance.now() - sw.t < 650;
+  sw = null;
+  if (quick && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.8) switchTo(secIndex + (dx < 0 ? 1 : -1));
+}, { passive: true });
 document.addEventListener('contextmenu', (e) => {
   if (e.target.closest('a, input')) return;
   if (screen === 'section') { e.preventDefault(); back(); }

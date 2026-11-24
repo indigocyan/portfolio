@@ -1,3 +1,17 @@
+/* ================================================================ Nightswim: typefaces drawn for this site
+   (built by tools/make_fonts.py). One file per style covers every weight the CSS asks for, so the
+   browser never fakes bold or italic. */
+@font-face { font-family: 'Nightswim Display'; src: url(../fonts/nightswim-display-italic.woff2) format('woff2'); font-style: italic; font-weight: 100 1000; font-display: swap; }
+@font-face { font-family: 'Nightswim Display'; src: url(../fonts/nightswim-display.woff2) format('woff2'); font-style: normal; font-weight: 100 1000; font-display: swap; }
+@font-face { font-family: 'Nightswim Label'; src: url(../fonts/nightswim-label-italic.woff2) format('woff2'); font-style: italic; font-weight: 100 1000; font-display: swap; }
+@font-face { font-family: 'Nightswim Label'; src: url(../fonts/nightswim-label.woff2) format('woff2'); font-style: normal; font-weight: 100 1000; font-display: swap; }
+/* Nightswim Text: real lowercase for information-heavy copy; a touch larger to match the x-height of
+   ordinary text faces */
+@font-face { font-family: 'Nightswim Text'; src: url(../fonts/nightswim-text.woff2) format('woff2'); font-style: normal; font-weight: 100 549; font-display: swap; size-adjust: 108%; }
+@font-face { font-family: 'Nightswim Text'; src: url(../fonts/nightswim-text-bold.woff2) format('woff2'); font-style: normal; font-weight: 550 1000; font-display: swap; size-adjust: 108%; }
+@font-face { font-family: 'Nightswim Text'; src: url(../fonts/nightswim-text-italic.woff2) format('woff2'); font-style: italic; font-weight: 100 549; font-display: swap; size-adjust: 108%; }
+@font-face { font-family: 'Nightswim Text'; src: url(../fonts/nightswim-text-bold-italic.woff2) format('woff2'); font-style: italic; font-weight: 550 1000; font-display: swap; size-adjust: 108%; }
+
 /* ================================================================ tokens */
 :root {
   --abyss: #020b3a;
@@ -9,10 +23,10 @@
   --ink: #05060c;
   --red: #ff1f3d;
   --pink: #ff6fb5;
-  --display: 'Sofia Sans Extra Condensed', 'Arial Narrow', sans-serif;   /* swapped at runtime, see FONTS in util.js */
-  --label: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif;      /* paired face for small labels */
+  --display: 'Nightswim Display', 'Sofia Sans Extra Condensed', 'Arial Narrow', sans-serif;   /* swapped at runtime, see FONTS in util.js */
+  --label: 'Nightswim Label', 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif;         /* paired face for small labels */
   --stretch: 100%;
-  --text: 'Barlow Semi Condensed', 'Arial Narrow', sans-serif;
+  --text: 'Nightswim Text', 'M PLUS 1p', 'Segoe UI', system-ui, sans-serif;   /* information text: descriptions, details, about */
   --skew: -14deg;
   --gut: clamp(16px, 3.2vw, 48px);
   --ease-out: cubic-bezier(.16, .9, .3, 1);

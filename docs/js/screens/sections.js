@@ -233,7 +233,7 @@ function system(d, ctx) {
       act: () => { settings.motion = settings.motion === 'full' ? 'reduced' : 'full'; saveSettings(); ctx.onSettings(); } },
     { label: 'Lite Mode', value: () => settings.effects === 'low' ? 'On' : 'Off', info: 'For older hardware: no WebGL sea, no clouds, glows or spinning ring, fewer particles and simpler transitions. Turns on by itself when the site runs slowly. Press L anywhere to switch.',
       act: () => ctx.toggleLite() },
-    { label: 'Typeface', value: () => FONTS[settings.font]?.name || 'Sofia Sans Extra Condensed', info: () => [h('p', null, `${FONTS[settings.font]?.name} for titles and menus, paired with Fira Sans Extra Condensed for labels. ${FONTS[settings.font]?.note}. Enter cycles through ${Object.keys(FONTS).length} options.`),
+    { label: 'Typeface', value: () => FONTS[settings.font]?.name || 'Nightswim Display', info: () => [h('p', null, `${FONTS[settings.font]?.name} for titles and menus, paired with Nightswim Label for labels. ${FONTS[settings.font]?.note}. Enter cycles through ${Object.keys(FONTS).length} options.`),
         h('a', { class: 'btn-open', href: 'fonts.html' }, 'Compare all typefaces')],
       act: () => { const keys = Object.keys(FONTS); settings.font = keys[(keys.indexOf(settings.font) + 1) % keys.length]; saveSettings(); ctx.onFont(); } },
     { label: 'About This Site', info: 'Plain HTML, CSS and a WebGL sea, no frameworks. The menus are a love letter to the interface design of Persona 3 Reload; nothing from the game is used.' },
@@ -248,6 +248,7 @@ function system(d, ctx) {
     h('div', { class: 'sys-disc pop', 'aria-hidden': 'true' }),
     h('div', { class: 'sys-list' }, items), info);
   const ctrl = makeList(items, {
+    tapActivates: true,
     onSelect: (i) => swapDetail(info, typeof opts[i].info === 'function' ? opts[i].info() : h('p', null, opts[i].info)),
     onActivate: (i) => {
       const o = opts[i];

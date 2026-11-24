@@ -11,7 +11,9 @@ export function realMove(e) {
   return true;
 }
 
-export function makeList(items, { onSelect, onActivate, start = 0, wrap = true, canAct = () => true } = {}) {
+// tapActivates: a touch tap on an unselected item selects and confirms it in one go (home options,
+// settings); without it, a first tap selects (showing details) and a second tap confirms
+export function makeList(items, { onSelect, onActivate, start = 0, wrap = true, canAct = () => true, tapActivates = false } = {}) {
   let sel = -1, pointer = 'mouse';
   const ctrl = {
     items,
@@ -34,7 +36,7 @@ export function makeList(items, { onSelect, onActivate, start = 0, wrap = true, 
     el.addEventListener('pointermove', (e) => { if (sel !== i && realMove(e)) ctrl.select(i); });
     el.addEventListener('click', (e) => {
       if (e.detail === 0) { if (sel !== i) ctrl.select(i); ctrl.activate(); return; }   // keyboard click
-      if (sel !== i) { ctrl.select(i); if (pointer !== 'mouse') return; }
+      if (sel !== i) { ctrl.select(i); if (pointer !== 'mouse' && !tapActivates) return; }
       ctrl.activate();
     });
   });
