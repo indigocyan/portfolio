@@ -291,9 +291,7 @@
 .cal-detail, .dir-detail, .sk-detail, .task { position: relative; }
 .sk-detail::after, .task::after { background-image: radial-gradient(circle, rgba(67, 211, 255, .22) 0 1.5px, transparent 1.9px); }
 
-/* scanline sheen over the whole UI, very faint */
-.app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 5;
-  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px); mix-blend-mode: overlay; }
+
 
 /* mobile overrides for the blocks above */
 @media (max-width: 820px), (orientation: portrait) and (max-width: 1024px) {
@@ -360,9 +358,9 @@
   transform: perspective(1600px) rotateZ(-18deg) rotateX(70deg); }
 .clock.back { clip-path: inset(0 0 50% 0); opacity: .45; }
 .clock.front { clip-path: inset(50% 0 0 0); }
-.clock g { animation: spin 90s linear infinite; }
+.clock svg { display: block; width: 100%; height: 100%; overflow: visible; animation: spin 90s linear infinite; will-change: transform; }
 .clouds { --d: .7; }
-.clouds i { position: absolute; left: -40%; width: 46vw; height: 10vh; border-radius: 50%; background: rgba(190, 215, 255, .13); filter: blur(16px); animation: cloud linear infinite; }
+.clouds i { position: absolute; left: -40%; width: 46vw; height: 10vh; background: radial-gradient(closest-side, rgba(190, 215, 255, .16), rgba(190, 215, 255, .07) 55%, transparent); animation: cloud linear infinite; will-change: transform; }
 .clouds i:nth-child(1) { top: 20%; animation-duration: 70s; animation-delay: -20s; }
 .clouds i:nth-child(2) { top: 34%; width: 60vw; height: 7vh; animation-duration: 95s; animation-delay: -60s; opacity: .8; }
 .clouds i:nth-child(3) { top: 12%; width: 30vw; animation-duration: 55s; animation-delay: -10s; }
@@ -430,3 +428,30 @@
 
 /* foam puffs that ride the pool's edge */
 .splash .puff { position: absolute; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ffffff 0 55%, #d8f6ff 72%, #9fe8ff 100%); }
+
+/* ================================================================ lite mode button + toast */
+.lite-btn { position: fixed; z-index: 5; top: calc(var(--gut) * .6); left: var(--gut); padding: .3em .9em .25em; background: rgba(2, 11, 58, .8); color: var(--foam);
+  border: 1px solid rgba(143, 231, 255, .45); transform: skewX(var(--skew)); font-family: var(--label); font-style: italic; font-weight: 700; font-size: 13px;
+  letter-spacing: .1em; text-transform: uppercase; transition: background .2s, color .2s, opacity .4s, left .4s var(--ease-out); }
+.lite-btn b { color: var(--cyan); }
+.lite-btn[aria-pressed="true"] { background: var(--white); color: var(--ink); }
+.lite-btn[aria-pressed="true"] b { color: var(--red); }
+.lite-btn:hover, .lite-btn:focus-visible { background: var(--cyan); color: var(--ink); }
+[data-screen="boot"] .lite-btn { opacity: 0; pointer-events: none; }
+[data-screen="section"] .lite-btn { left: calc(var(--gut) + 116px); }
+.toast { position: fixed; z-index: 9; left: 50%; bottom: 22px; translate: -50% 0; padding: .55em 1.2em; background: var(--white); color: var(--ink); box-shadow: 5px 5px 0 var(--red);
+  font-family: var(--label); font-style: italic; font-weight: 700; font-size: 15px; transform: skewX(var(--skew)); opacity: 0; pointer-events: none; transition: opacity .3s, translate .3s var(--ease-out); }
+.toast.show { opacity: 1; translate: -50% -6px; }
+
+/* ================================================================ LITE MODE: fewer, cheaper effects */
+.lite #sea { display: none; }
+.lite .sea-css { display: block; }
+.lite .sea-css i { animation: none; mix-blend-mode: normal; opacity: .6; }
+.lite .clouds, .lite .stars.s2, .lite .drift .shard, .lite .giant::before, .lite .moon::after { display: none; }
+.lite .stars, .lite .moon-glow, .lite .clock svg, .lite .ci.sel .ci-word, .lite .ci.sel .ci-shard, .lite .sk-row.sel .sk-meter i.on { animation: none; }
+.lite .moon { box-shadow: inset -2.4vh -2.8vh 4.5vh rgba(8, 26, 100, .55), 0 0 30px 8px rgba(200, 230, 255, .45); }
+.lite .night .layer { transition: none; }
+.lite .card.sel::after, .lite .sk-row.sel::after, .lite .ev-row.sel::after, .lite .qrow.sel::after, .lite .dir-row.sel::after, .lite .plate.sel .plate-val::after { display: none; }
+@media (max-width: 820px) { [data-screen="section"] .lite-btn { left: calc(16px + 104px); top: 12px; } .lite-btn { top: 12px; left: 16px; } }
+/* the underwater layer is fully covered on Home: do not animate it there */
+[data-screen="title"] .drift { display: none; }

@@ -57,9 +57,6 @@ void main(){
   r = smoothstep(.5, .85, r);
   col += vec3(.5, .86, 1.) * r * .15 * smoothstep(.05, 1., suv.y) * (1. - uDepth * .55);
 
-  // shimmer along the surface
-  float sh = caustic(vec2(p.x * 1.6, p.y * .5 + t * .1), t * 1.4);
-  col += vec3(.75, .95, 1.) * smoothstep(.45, .55, sh) * smoothstep(.84, 1., suv.y) * .3 * (1. - uDepth * .5);
 
   // halftone screen in the lower dark
   float tone = (1. - smoothstep(0., .5, suv.y)) * .75 + uDepth * .2;
@@ -91,68 +88,79 @@ export function setMood(name, nudge = 0) {
   document.body.dataset.mood = name;
 }
 
-export function initSea() {
-  const canvas = document.getElementById('sea');
-  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
-  if (!gl) { document.body.classList.add('no-gl'); return; }
+// The sea only renders when it can be seen: not on Home (the night scene covers it), not in a
+// hidden tab, and never in lite mode (the CSS gradient sea stands in). It renders at a reduced
+// resolution, upscaled by the browser, and at most 30 frames a second.
+const view = { gl: null, canvas: null, U: null, raf: 0, last: 0, t: 0, scale: 1, slow: 0, failed: false };
+const lite = () => settings.effects === 'low';
+const wanted = () => !view.failed && !lite() && !document.hidden && !['title', 'boot'].includes(document.body.dataset.screen);
 
-  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+function setup() {
+  const canvas = view.canvas = document.getElementById('sea');
+  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, depth: false, stencil: false, powerPreference: 'low-power' });
+  if (!gl) { view.failed = true; document.body.classList.add('no-gl'); return false; }
+  const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return x; };
   const prog = gl.createProgram();
   gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
   gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { document.body.classList.add('no-gl'); return; }
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { view.failed = true; document.body.classList.add('no-gl'); return false; }
   gl.useProgram(prog);
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, 'a');
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = Object.fromEntries(['uRes', 'uTime', 'uCam', 'uDepth', 'uRay', 'uScale'].map((n) => [n, gl.getUniformLocation(prog, n)]));
-
-  let scale = 1, slow = 0;
-  function resize() {
-    const cap = settings.effects === 'low' ? .6 : 1.25;
-    const dpr = Math.min(devicePixelRatio || 1, cap) * scale;
-    canvas.width = Math.round(innerWidth * dpr);
-    canvas.height = Math.round(innerHeight * dpr);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.uniform1f(U.uScale, dpr);
-  }
+  view.U = Object.fromEntries(['uRes', 'uTime', 'uCam', 'uDepth', 'uRay', 'uScale'].map((n) => [n, gl.getUniformLocation(prog, n)]));
+  view.gl = gl;
   resize();
-  addEventListener('resize', resize);
-  addEventListener('pointermove', (e) => {
-    state.mouse = [(e.clientX / innerWidth - .5), (e.clientY / innerHeight - .5)];
-  }, { passive: true });
-  initSea.resize = resize;
-
-  let last = performance.now(), t = 0, raf = 0;
-  function frame(now) {
-    const dt = Math.min(.05, (now - last) / 1000);
-    last = now;
-    const speed = reduced() ? .35 : 1;
-    t += dt * speed;
-    const k = 1 - Math.exp(-dt * (reduced() ? 6 : 2.6));
-    const tg = state.target, par = reduced() ? 0 : .04;
-    state.cam[0] += (tg.cam[0] + state.extra[0] + state.mouse[0] * par - state.cam[0]) * k;
-    state.cam[1] += (tg.cam[1] + state.extra[1] - state.mouse[1] * par - state.cam[1]) * k;
-    state.depth += (tg.depth - state.depth) * k;
-    state.ray += (tg.ray - state.ray) * k;
-    gl.uniform2f(U.uRes, canvas.width, canvas.height);
-    gl.uniform1f(U.uTime, t);
-    gl.uniform2f(U.uCam, state.cam[0], state.cam[1]);
-    gl.uniform1f(U.uDepth, state.depth);
-    gl.uniform1f(U.uRay, state.ray);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    // adapt: if frames are consistently slow, render at a lower resolution
-    if (dt > .024) { if (++slow > 50 && scale > .5) { scale -= .2; slow = 0; resize(); } } else slow = Math.max(0, slow - 1);
-    raf = requestAnimationFrame(frame);
-  }
-  raf = requestAnimationFrame(frame);
-  document.addEventListener('visibilitychange', () => {
-    cancelAnimationFrame(raf);
-    if (!document.hidden) { last = performance.now(); raf = requestAnimationFrame(frame); }
-  });
-  document.body.classList.add('gl-on');
+  return true;
+}
+function resize() {
+  const { gl, canvas, U } = view;
+  if (!gl) return;
+  const dpr = Math.min(devicePixelRatio || 1, 1.5) * .6 * view.scale;
+  canvas.width = Math.round(innerWidth * dpr);
+  canvas.height = Math.round(innerHeight * dpr);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.uniform2f(U.uRes, canvas.width, canvas.height);
+  gl.uniform1f(U.uScale, dpr);
+}
+function frame(now) {
+  view.raf = requestAnimationFrame(frame);
+  const elapsed = now - view.last;
+  if (elapsed < 31) return;                       // ~30 fps is plenty for a slow backdrop
+  const dt = Math.min(.1, elapsed / 1000);
+  view.last = now;
+  const { gl, U } = view;
+  view.t += dt * (reduced() ? .35 : 1);
+  const k = 1 - Math.exp(-dt * (reduced() ? 6 : 2.6));
+  const tg = state.target, par = reduced() ? 0 : .04;
+  state.cam[0] += (tg.cam[0] + state.extra[0] + state.mouse[0] * par - state.cam[0]) * k;
+  state.cam[1] += (tg.cam[1] + state.extra[1] - state.mouse[1] * par - state.cam[1]) * k;
+  state.depth += (tg.depth - state.depth) * k;
+  state.ray += (tg.ray - state.ray) * k;
+  gl.uniform1f(U.uTime, view.t);
+  gl.uniform2f(U.uCam, state.cam[0], state.cam[1]);
+  gl.uniform1f(U.uDepth, state.depth);
+  gl.uniform1f(U.uRay, state.ray);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // if frames are still slow, drop the resolution further
+  if (dt > .05) { if (++view.slow > 20 && view.scale > .5) { view.scale -= .15; view.slow = 0; resize(); } } else view.slow = Math.max(0, view.slow - 1);
+}
+// start or stop rendering to match what is on screen; call after any screen or setting change
+export function updateSea() {
+  const on = wanted();
+  document.body.classList.toggle('gl-on', on || (!!view.gl && !lite() && !view.failed));
+  if (on && !view.gl && !setup()) return;
+  if (on && !view.raf) { view.last = performance.now() - 40; view.raf = requestAnimationFrame(frame); }
+  if (!on && view.raf) { cancelAnimationFrame(view.raf); view.raf = 0; }
+}
+export function initSea() {
+  let pending = 0;
+  addEventListener('resize', () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(resize); });
+  addEventListener('pointermove', (e) => { state.mouse = [(e.clientX / innerWidth - .5), (e.clientY / innerHeight - .5)]; }, { passive: true });
+  document.addEventListener('visibilitychange', updateSea);
+  initSea.resize = () => { view.scale = 1; resize(); updateSea(); };
+  updateSea();
 }

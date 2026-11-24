@@ -143,11 +143,22 @@ Dates accept `2024`, `Jun 2024`, `2024-06`, `Present`. The calendar collects eve
   focus moves with the cursor, visible focus ring, text contrast ≥ 4.5:1.
 - `<noscript>` renders the same content as a plain page; no content is canvas-only.
 
-## 8. Performance
+## 8. Performance and lite mode
 
-- Canvas renders at ≤ 1.5× DPR, pauses when the tab is hidden, drops to half resolution when
-  frame time exceeds 20 ms. Without WebGL, a layered CSS gradient + caustic animation takes over.
-- Only `transform` and `opacity` are animated on UI elements.
+- The WebGL sea renders only where it can be seen: never on Home (the night scene covers it), never
+  in a hidden tab, never in lite mode. It draws at 60 % of a pixel-density cap of 1.5, upscaled by
+  the browser, at most 30 frames a second, and drops resolution further if frames stay slow.
+  WebGL is only initialised the first time the sea is needed.
+- Only `transform` and `opacity` are animated on UI elements; the clock ring spins the whole SVG
+  (composited) instead of its contents; clouds are soft gradients, not blurred elements; no
+  full-screen blend-mode overlays. The underwater bubbles stop while Home is showing.
+- Pointer parallax updates at most once per frame. Particle counts in the dive are capped
+  (60 bubbles, 24 droplets, 14 jets, 28 foam puffs per phase).
+- **Lite mode** (button top left, System → Lite Mode, or the L key): CSS sea instead of WebGL, no
+  clouds, glows, spinning ring, shard drift, gloss sweeps or parallax, a third of the particles,
+  a gentler camera pull-back, and a fade instead of the drain that repaints every frame. It turns
+  on by itself on devices with ≤ 4 GB memory or ≤ 4 cores or with data saver, and when frames
+  during the opening animation are slow (median over 34 ms), unless the visitor has chosen.
 - Fonts load with `display=swap`; the shell is usable before they arrive.
 
 ## 9. Release

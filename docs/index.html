@@ -42,9 +42,9 @@
         <div class="layer sky"><i class="stars"></i><i class="stars s2"></i></div>
         <div class="layer moon-layer">
           <div class="moon-glow"></div>
-          <svg class="clock back" viewBox="-100 -100 200 200"></svg>
+          <div class="clock back"><svg viewBox="-100 -100 200 200"></svg></div>
           <div class="moon"><i class="mare m1"></i><i class="mare m2"></i><i class="mare m3"></i><i class="crater c1"></i><i class="crater c2"></i><i class="crater c3"></i><i class="crater c4"></i><i class="crater c5"></i><i class="moon-shade"></i></div>
-          <svg class="clock front" viewBox="-100 -100 200 200"></svg>
+          <div class="clock front"><svg viewBox="-100 -100 200 200"></svg></div>
         </div>
         <div class="layer clouds"><i></i><i></i><i></i><i></i><i></i></div>
         <div class="layer frame">
@@ -88,6 +88,8 @@
   </main>
 
   <aside class="datepanel" id="datepanel" aria-label="Today"></aside>
+  <button class="lite-btn" id="lite-btn" type="button" aria-pressed="false" title="Fewer effects for older devices (L)">Lite <b>Off</b></button>
+  <div class="toast" id="toast" role="status"></div>
 
   <footer class="guide" id="guide">
     <p class="guide-text" id="guide-text" aria-live="polite"></p>

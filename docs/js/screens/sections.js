@@ -231,8 +231,8 @@ function system(d, ctx) {
   const opts = [
     { label: 'Motion', value: () => settings.motion === 'full' ? 'Full' : 'Reduced', info: 'Full choreography, or short cross-fades only.',
       act: () => { settings.motion = settings.motion === 'full' ? 'reduced' : 'full'; saveSettings(); ctx.onSettings(); } },
-    { label: 'Effects', value: () => settings.effects === 'high' ? 'High' : 'Low', info: 'Backdrop resolution and drifting particles. Low is kinder to older devices.',
-      act: () => { settings.effects = settings.effects === 'high' ? 'low' : 'high'; saveSettings(); ctx.onSettings(); } },
+    { label: 'Lite Mode', value: () => settings.effects === 'low' ? 'On' : 'Off', info: 'For older hardware: no WebGL sea, no clouds, glows or spinning ring, fewer particles and simpler transitions. Turns on by itself when the site runs slowly. Press L anywhere to switch.',
+      act: () => ctx.toggleLite() },
     { label: 'Typeface', value: () => FONTS[settings.font]?.name || 'Sofia Sans Extra Condensed', info: () => [h('p', null, `${FONTS[settings.font]?.name} for titles and menus, paired with Fira Sans Extra Condensed for labels. ${FONTS[settings.font]?.note}. Enter cycles through ${Object.keys(FONTS).length} options.`),
         h('a', { class: 'btn-open', href: 'fonts.html' }, 'Compare all typefaces')],
       act: () => { const keys = Object.keys(FONTS); settings.font = keys[(keys.indexOf(settings.font) + 1) % keys.length]; saveSettings(); ctx.onFont(); } },

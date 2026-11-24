@@ -5,7 +5,7 @@
 //              while the water covers it (home <-> sections)
 //   switchTo() section <-> section: overlapping slides, a heavier slash on long jumps
 import { $, $$, h, sleep, anim, settle, settings, saveSettings, reduced, applyFont, FONTS, safeUrl, pretty, EASE_OUT, EASE_POP, moonPhase, phaseName, moonLitPath, timeOfDay } from './util.js';
-import { initSea, setMood } from './sea.js';
+import { initSea, setMood, updateSea } from './sea.js';
 import { makeList } from './list.js';
 import { SECTIONS } from './screens/sections.js';
 
@@ -22,7 +22,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 // ================================================================ chrome: drift, date, guide
 function spawnDrift() {
   const box = $('#drift');
-  const n = settings.effects === 'low' || innerWidth < 760 ? [10, 8] : [26, 18];
+  const n = settings.effects === 'low' ? [8, 0] : innerWidth < 760 ? [10, 6] : [20, 12];
   const kids = [];
   for (let i = 0; i < n[0]; i++) {
     const s = Math.random() < .15 ? 22 + Math.random() * 20 : 4 + Math.random() * 14;
@@ -133,22 +133,22 @@ async function surge(mid, origin) {
   const rimIn = h('i', { class: 'rim', style: box }), rimOut = h('i', { class: 'rim out', style: box });
   const vmin = Math.min(W, H) / 100;
   // jets: tapered streams branching out from the source
-  const jets = Array.from({ length: lite ? 8 : 18 }, (_, k, n = lite ? 8 : 18) => {
+  const jets = Array.from({ length: lite ? 6 : 14 }, (_, k, n = lite ? 6 : 14) => {
     const w = rnd(1.2, 3.2) * vmin, len = rnd(14, 34) * vmin;
     const el = h('i', { class: 'jet' + (k % 3 ? '' : ' c'), style: `left:${ox}px;top:${oy}px;width:${w}px;height:${len}px;margin:${-len}px 0 0 ${-w / 2}px;rotate:${(k / n) * 360 + rnd(-8, 8)}deg` });
     return [el, len];
   });
-  const drops = Array.from({ length: lite ? 12 : 34 }, () => {
+  const drops = Array.from({ length: lite ? 8 : 24 }, () => {
     const s = rnd(5, 18);
     return h('i', { class: 'drop' + (Math.random() < .35 ? ' c' : ''), style: `left:${ox - s / 2}px;top:${oy - s / 2}px;width:${s}px;height:${s * 1.25}px` });
   });
-  const bubs = Array.from({ length: lite ? 30 : 96 }, () => {
+  const bubs = Array.from({ length: lite ? 18 : 60 }, () => {
     const big = Math.random() < .14, s = big ? rnd(46, 110) : rnd(8, 40);
     return h('i', { class: 'bub' + (!big && Math.random() < .3 ? ' solid' : ''), style: `left:${ox - s / 2}px;top:${oy - s / 2}px;width:${s}px;height:${s}px` });
   });
   // foam puffs riding the water's edge: one set for the flood, one for the drain
   const puffSet = () => {
-    const n = lite ? 16 : 40;
+    const n = lite ? 12 : 28;
     return Array.from({ length: n }, (_, k) => {
       const s = rnd(3, 7.5) * vmin, a = (k / n) * Math.PI * 2 + rnd(-.06, .06);
       return [h('i', { class: 'puff', style: `left:${ox - s / 2}px;top:${oy - s / 2}px;width:${s}px;height:${s * rnd(.7, 1)}px` }), a];
@@ -190,7 +190,7 @@ async function surge(mid, origin) {
   await sleep(IN + 40);
   await mid();
   await sleep(90);
-  if (holeOk) {
+  if (holeOk && !lite) {   // the widening hole repaints every frame, so lite mode fades instead
     sp.append(...puffsOut.map((p) => p[0]));
     ride(puffsOut, OUT);
     anim(rimOut, [{ transform: 'scale(0)', opacity: 1 }, { transform: 'scale(1)', opacity: 1, offset: .85 }, { transform: 'scale(1)', opacity: 0 }], { duration: OUT, easing: ease, fill: 'forwards' });
@@ -222,6 +222,7 @@ function show(id) { const el = $(id); el.hidden = false; return el; }
 function setScreen(s, mood) {
   screen = s;
   body.dataset.screen = s;
+  updateSea();   // the WebGL sea only runs where it can be seen
   setMood(mood || s, s === 'section' ? secIndex - sections.length / 2 : 0);
 }
 const sectionMood = (i) => sections[i].id === 'system' ? 'system' : 'section';
@@ -249,7 +250,7 @@ function buildHome() {
     const a = i / 60 * Math.PI * 2, major = i % 5 === 0, r1 = major ? 84 : 90;
     return `<line x1="${(Math.sin(a) * r1).toFixed(1)}" y1="${(-Math.cos(a) * r1).toFixed(1)}" x2="${(Math.sin(a) * 96).toFixed(1)}" y2="${(-Math.cos(a) * 96).toFixed(1)}" stroke-width="${major ? 2.4 : 1}"/>`;
   }).join('');
-  $$('.clock').forEach((c) => { c.innerHTML = `<g stroke="#cdf3ff" fill="none"><circle r="99" stroke-width="1.4"/><circle r="97" stroke-width=".6" stroke-dasharray="2 4"/>${ticks}<circle r="78" stroke-width=".8"/></g>`; });
+  $$('.clock svg').forEach((c) => { c.innerHTML = `<g stroke="#cdf3ff" fill="none"><circle r="99" stroke-width="1.4"/><circle r="97" stroke-width=".6" stroke-dasharray="2 4"/>${ticks}<circle r="78" stroke-width=".8"/></g>`; });
   // options: one word per section
   const items = sections.map((s, i) => h('li', { class: 'ci-li', style: `--i:${i};--x:${ZIG[i % ZIG.length]}` },
     h('button', { class: 'ci', type: 'button' },
@@ -278,8 +279,9 @@ async function homeIn(mode = 'return') {
   menu.select(secIndex, true);
   setGuide(sections[secIndex].guide, 'title');
   const intro = mode === 'intro';
-  const zoom = { sky: 1.5, 'moon-layer': 2.2, clouds: 2.8, frame: 3.8 };
-  const D = intro ? 2800 : 1400;
+  // smaller zooms keep the scaled layers cheap to draw; lite mode moves the far planes less still
+  const zoom = isLite() ? { sky: 1.15, 'moon-layer': 1.5, clouds: 1.5, frame: 1.9 } : { sky: 1.3, 'moon-layer': 1.8, clouds: 2.1, frame: 2.6 };
+  const D = intro ? (isLite() ? 2000 : 2600) : 1300;
   for (const [k, z] of Object.entries(zoom)) {
     anim($(`#scr-title .${k}`), [{ scale: intro ? z : 1 + (z - 1) * .2 }, { scale: 1 }], { duration: D, easing: 'cubic-bezier(.3,.6,.1,1)' });
   }
@@ -296,13 +298,60 @@ async function homeIn(mode = 'return') {
   if (device === 'keys') menu.items[secIndex]?.focus({ preventScroll: true });
 }
 function hideHome() { $('#scr-title').hidden = true; }
-// pointer parallax on the night scene
+// pointer parallax on the night scene, at most once per frame (off in lite mode)
+let pmX = 0, pmY = 0, pmRaf = 0;
 addEventListener('pointermove', (e) => {
-  if (screen !== 'title' || reduced()) return;
-  const home = $('#scr-title');
-  home.style.setProperty('--mx', ((e.clientX / innerWidth - .5) * -24).toFixed(1) + 'px');
-  home.style.setProperty('--my', ((e.clientY / innerHeight - .5) * -16).toFixed(1) + 'px');
+  if (screen !== 'title' || reduced() || isLite()) return;
+  pmX = e.clientX; pmY = e.clientY;
+  if (pmRaf) return;
+  pmRaf = requestAnimationFrame(() => {
+    pmRaf = 0;
+    const home = $('#scr-title');
+    home.style.setProperty('--mx', ((pmX / innerWidth - .5) * -24).toFixed(0) + 'px');
+    home.style.setProperty('--my', ((pmY / innerHeight - .5) * -16).toFixed(0) + 'px');
+  });
 }, { passive: true });
+
+// ---------------------------------------------------------------- LITE MODE
+// Fewer, cheaper effects for older hardware: no WebGL sea, no clouds/glows/spinning ring, fewer
+// particles, no parallax, and a fade instead of the repainting drain. It turns itself on for
+// low-end devices and when the opening animation runs slowly, unless the visitor has chosen.
+const isLite = () => settings.effects === 'low';
+function setLite(on, byUser, quiet) {
+  settings.effects = on ? 'low' : 'high';
+  if (byUser) settings.liteChosen = true;
+  saveSettings();
+  body.classList.toggle('lite', on);
+  const b = $('#lite-btn');
+  b.setAttribute('aria-pressed', String(on));
+  b.querySelector('b').textContent = on ? 'On' : 'Off';
+  if (on) $('#scr-title').style.setProperty('--mx', '0px'), $('#scr-title').style.setProperty('--my', '0px');
+  spawnDrift();
+  updateSea();
+  if (!quiet) toast(on ? 'Lite mode on: fewer effects' : 'Lite mode off: full effects');
+}
+let toastT;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+$('#lite-btn').addEventListener('click', () => setLite(!isLite(), true));
+// watch frame times while the opening plays; consistently slow frames switch lite mode on
+function probeSpeed(ms) {
+  if (settings.liteChosen || isLite()) return;
+  const times = [];
+  let last = performance.now(), stop = last + ms;
+  const tick = (now) => {
+    times.push(now - last); last = now;
+    if (now < stop && !document.hidden) return requestAnimationFrame(tick);
+    if (document.hidden || times.length < 10) return;
+    times.sort((a, b) => a - b);
+    const median = times[times.length >> 1];
+    if (median > 34) { setLite(true, false, true); toast('Lite mode on for smoother motion (press L to switch)'); }
+  };
+  requestAnimationFrame(tick);
+}
 
 // ---------------------------------------------------------------- SECTION: tab strip
 function buildStrip() {
@@ -329,6 +378,7 @@ function updateStrip(animate) {
 const ctx = {
   replay: () => { history.replaceState(null, '', location.pathname + location.search); location.reload(); },
   onSettings: () => { body.classList.toggle('reduced', reduced()); spawnDrift(); initSea.resize?.(); },
+  toggleLite: () => setLite(!isLite(), true, true),
   onFont: async () => { await applyFont(settings.font); updateStrip(false); },
 };
 function buildPage() {
@@ -456,6 +506,7 @@ document.addEventListener('keydown', (e) => {
   noteDevice('keys');
   const k = e.key;
   if (/^[1-9]$/.test(k)) { e.preventDefault(); jump(+k - 1); return; }
+  if ((k === 'l' || k === 'L') && !e.target.closest?.('input, textarea')) { e.preventDefault(); setLite(!isLite(), true); return; }
   const lst = screen === 'title' ? menu : page?.list;
   const onLink = e.target.closest?.('a');
   if (k === 'ArrowDown' || k === 's' || k === 'S') { e.preventDefault(); if (!busy) lst?.move(1); }
@@ -495,6 +546,10 @@ addEventListener('hashchange', () => {
   const pick = new URLSearchParams(location.search).get('font');   // fonts.html links here with ?font=<key>
   if (pick && FONTS[pick]) { settings.font = pick; saveSettings(); history.replaceState(null, '', location.pathname + location.hash); }
   const fontReady = applyFont(settings.font);
+  // lite mode: the visitor's own choice wins; otherwise judge the device
+  const n = navigator;
+  const weak = !!((n.deviceMemory && n.deviceMemory <= 4) || (n.hardwareConcurrency && n.hardwareConcurrency <= 4) || n.connection?.saveData);
+  setLite(settings.liteChosen ? isLite() : weak, false, true);
   initSea();
   spawnDrift();
   drawDate();
@@ -516,6 +571,7 @@ addEventListener('hashchange', () => {
   busy = true;
   let entered;
   await startup(() => {
+    probeSpeed(1800);
     if (target >= 0) { secIndex = target; menu.select(target, true); setScreen('section', sectionMood(target)); entered = sectionIn(0); }
     else { setScreen('title'); entered = homeIn('intro'); }
   });
